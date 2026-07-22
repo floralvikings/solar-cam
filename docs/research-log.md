@@ -5,6 +5,50 @@ Newest entries at the top. Keep **observed facts** separate from
 **hypotheses**, and tag conclusions: **Confirmed / Strongly indicated /
 Possible / Unknown**.
 
+> Redaction note: full MAC / device UID are kept out of committed docs
+> (recorded only in the operator's local notes). OUI + RFC1918 IPs are fine.
+
+---
+
+## 2026-07-21 — First live probe of the camera
+
+**Conditions:** Camera online & awake (UBox not necessarily open). Camera at
+`192.168.88.113` on the MikroTik `192.168.88.0/24` LAN. No captures yet.
+
+**Command:** `python scripts/probe_camera.py 192.168.88.113`
+
+**Observed (facts):**
+- Camera responds to ICMP ping and is in the ARP table → **awake**.
+- MAC OUI `84:1D:E8` → **CJ intelligent technology LTD.** (resolved via
+  tshark manufacturer DB) — a Chinese IoT/camera ODM.
+- **Zero open TCP ports** from the curated camera/RTSP/ONVIF/HTTP list — now
+  confirmed *while awake*, so the earlier nmap result was not just "asleep".
+- **No RTSP** on 554/8554.
+- **ONVIF WS-Discovery: camera silent** (0 replies from the camera).
+- **SSDP/UPnP: camera silent.** 10 replies came from *other* LAN devices
+  (`192.168.88.37` = a WPS/Wi-Fi-Alliance WFADevice, likely the router/AP;
+  `192.168.88.76` = an Android/Chromecast device) — none from the camera.
+
+**Interpretation:**
+- The camera exposes **no local listening services or discovery responders**
+  of any conventional kind. Tag: **Confirmed** (for TCP + RTSP + ONVIF-WSD +
+  SSDP, camera awake).
+- Consistent with an **outbound-only, cloud-assisted P2P** design; local
+  ONVIF/RTSP/Generic-Camera integration paths are effectively ruled out
+  *unless* firmware analysis reveals a disabled/hidden server. Tag: **Strongly
+  indicated.**
+
+**Tooling fix (this session):** `probe_camera.py` now attributes WS-Discovery/
+SSDP replies to the camera vs other LAN devices, and only counts the camera's
+own replies toward "awake". (Previously other devices' SSDP replies were
+listed ambiguously.)
+
+**Next experiment (smallest first):**
+1. Static DHCP lease for `192.168.88.113` on the MikroTik.
+2. Passive capture of **boot** and **idle**, then `summarize_pcap.py` +
+   `extract_dns.py` to enumerate the vendor DNS names / cloud endpoints and
+   the steady-state outbound flows (expect a persistent keepalive).
+
 ---
 
 ## 2026-07-21 — Project bootstrap & analysis tooling

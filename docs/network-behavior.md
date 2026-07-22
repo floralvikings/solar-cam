@@ -4,9 +4,15 @@ Observed network behavior per scenario. Populate from captures using
 `scripts/summarize_pcap.py` and `scripts/compare_sessions.py`.
 
 ## Known so far
+- Camera IP `192.168.88.113`, MAC OUI `84:1D:E8` (CJ intelligent technology
+  LTD.), on MikroTik `192.168.88.0/24`. — **Confirmed** (2026-07-21 probe).
 - Full TCP port scan found **no listening services** (`nmap -Pn -p-`,
-  `nmap -Pn -sV -A`). Tag: **Confirmed** (prior work) — but re-verify while the
-  camera is awake, since a sleeping radio would look identical.
+  `nmap -Pn -sV -A`). Re-confirmed via `probe_camera.py` **while awake**
+  (ping+ARP up, targeted TCP list all closed). Tag: **Confirmed.**
+- **No RTSP** (554/8554), **no ONVIF** (WS-Discovery silent), **no SSDP/UPnP**
+  from the camera. Tag: **Confirmed** (camera awake, 2026-07-21).
+- ⇒ Local ONVIF / Generic-RTSP / SSDP integration paths ruled out barring a
+  hidden server in firmware. Focus shifts to passive capture of outbound P2P.
 
 ## Scenario matrix (fill from captures)
 
