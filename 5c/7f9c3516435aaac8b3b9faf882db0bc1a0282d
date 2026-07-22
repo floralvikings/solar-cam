@@ -1,0 +1,37 @@
+docs/research-log.md
+  s_76f8a99bc79680::t_2b5bb51242cd25 1-59
+wireshark/display-filters.txt
+  s_76f8a99bc79680::t_50c47f7723893f 1-66
+docs/hardware-notes.md
+  s_76f8a99bc79680::t_0774b534a6f3f9 1-34
+docs/device-profile.md
+  s_76f8a99bc79680::t_e5c987f04e6856 1-35
+README.md
+  s_76f8a99bc79680::t_6b6007461c96bc 1-105
+docs/network-behavior.md
+  s_76f8a99bc79680::t_7978913b35680b 1-47
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_5f6f256aad7e20 1-52
+docs/cloud-dependencies.md
+  s_76f8a99bc79680::t_248602d6c90b2b 1-38
+docs/firmware-analysis.md
+  s_76f8a99bc79680::t_be0c28b5af1a4c 1-42
+integrations/README.md
+  s_76f8a99bc79680::t_f907c7878858a7 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5c7f9c3516435aaac8b3b9faf882db0bc1a0282d",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
