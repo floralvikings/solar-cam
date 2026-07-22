@@ -1,0 +1,66 @@
+# Wireshark / tshark display-filter cheatsheet for the RBX-S73
+# Replace 192.168.50.42 with the camera IP. Use with: tshark -r cap.pcap -Y '<filter>'
+
+## Scope to the camera
+ip.addr == 192.168.50.42
+ip.src == 192.168.50.42            # camera -> out
+ip.dst == 192.168.50.42            # in -> camera
+
+## Name resolution / bootstrap
+dns
+dns.flags.response == 1            # answers only
+dhcp                              # (bootp) address assignment
+ntp
+arp
+
+## Local discovery
+mdns
+udp.port == 5353                  # mDNS
+udp.port == 1900                  # SSDP / UPnP
+udp.port == 3702                  # WS-Discovery (ONVIF)
+llmnr
+
+## P2P / NAT traversal
+stun                              # classic-STUN + STUN2 (covers many P2P SDKs)
+turn
+classicstun
+udp.port == 3478                  # common STUN/TURN
+
+## Media
+rtp
+rtcp
+rtsp
+srtp
+
+## Transport security
+tls
+tls.handshake.type == 1           # ClientHello (has SNI)
+tls.handshake.extensions_server_name
+quic
+dtls
+
+## Messaging
+mqtt
+websocket
+
+## Finding the proprietary flows (the important ones)
+# Non-DNS, non-mDNS, non-standard UDP to/from the camera:
+udp && ip.addr==192.168.50.42 && !dns && !mdns && !stun && udp.port>1024
+
+# High-volume UDP (likely video) — big frames:
+udp && frame.len > 1000 && ip.addr==192.168.50.42
+
+# Small periodic UDP (likely keepalive) — tune the size:
+udp && frame.len < 128 && ip.addr==192.168.50.42
+
+# Everything the camera talks to that ISN'T on the local /24 (cloud):
+ip.addr==192.168.50.42 && !(ip.addr==192.168.50.0/24)
+
+## Handy tshark one-liners
+# Unique remote endpoints the camera contacts:
+#   tshark -r cap.pcap -Y 'ip.src==192.168.50.42' -T fields -e ip.dst -e udp.dstport -e tcp.dstport | sort -u
+# Conversation table:
+#   tshark -r cap.pcap -q -z conv,udp
+#   tshark -r cap.pcap -q -z conv,tcp
+# Protocol hierarchy:
+#   tshark -r cap.pcap -q -z io,phs

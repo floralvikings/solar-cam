@@ -1,0 +1,56 @@
+# --- Sensitive research data (NEVER commit) ---
+# Packet captures may contain device UIDs, tokens, MACs, and payloads
+*.pcap
+*.pcapng
+*.cap
+captures/*
+!captures/.gitkeep
+
+# Mobile app artifacts
+*.apk
+*.xapk
+*.aab
+
+# Firmware images and extractions
+firmware/*
+!firmware/.gitkeep
+*.bin
+_*.extracted/
+
+# Secrets, credentials, tokens, keys
+secrets/
+.env
+.env.*
+*.key
+*.pem
+*.p12
+credentials.json
+tokens.json
+
+# TLS interception exports
+*.sslkeylog
+sslkeys*.log
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# --- Local scratch ---
+scratch/
+tmp/
+*.log
+!docs/**/*.log
