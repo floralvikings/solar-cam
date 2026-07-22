@@ -1,0 +1,23 @@
+docs/device-profile.md
+  s_76f8a99bc79680::t_01ec3ba41c4870 13-14,17-22
+docs/research-log.md
+  s_76f8a99bc79680::t_ccff77a22492b5 8-51
+docs/network-behavior.md
+  s_76f8a99bc79680::t_dccba642fe6070 7-8,10-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "16e555db4c85af191e65d7f1289152f2e1e1c115",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
