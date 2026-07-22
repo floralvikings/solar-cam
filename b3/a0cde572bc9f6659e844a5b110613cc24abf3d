@@ -1,0 +1,21 @@
+scripts/probe_camera.py
+  s_76f8a99bc79680::t_b27a3aead66b99 178,180-182,184-185,187-195,197,202-206
+  s_76f8a99bc79680::t_601f4804b2fb94 241-251
+  s_76f8a99bc79680::t_4ade98c5eab97d 207-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "b3a0cde572bc9f6659e844a5b110613cc24abf3d",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
