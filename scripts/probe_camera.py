@@ -175,21 +175,35 @@ def probe(
     result["open_tcp_ports"] = open_ports
     result["rtsp_options"] = rtsp
 
+    camera_discovery = False
     if do_discovery:
-        result["ws_discovery"] = _multicast_probe(
-            _WS_DISCOVERY_PROBE.encode(), WS_DISCOVERY_ADDR, timeout
+        ws = _annotate_replies(
+            _multicast_probe(_WS_DISCOVERY_PROBE.encode(), WS_DISCOVERY_ADDR, timeout),
+            ip,
         )
-        result["ssdp"] = _multicast_probe(
-            _SSDP_MSEARCH.encode(), SSDP_ADDR, timeout
+        ssdp = _annotate_replies(
+            _multicast_probe(_SSDP_MSEARCH.encode(), SSDP_ADDR, timeout), ip
         )
+        result["ws_discovery"] = ws
+        result["ssdp"] = ssdp
+        # Only replies FROM the camera count -- other LAN devices (router,
+        # Chromecast, ...) answer these multicast probes too.
+        camera_discovery = any(r.get("is_camera") for r in ws + ssdp)
+    result["camera_responded_to_discovery"] = camera_discovery
 
+    # "awake" must reflect the CAMERA, so it is based on ping/arp/its own
+    # open ports / its own discovery replies -- never other devices' replies.
     result["awake"] = bool(
-        result["ping"]
-        or result["arp_mac"]
-        or open_ports
-        or (do_discovery and (result.get("ws_discovery") or result.get("ssdp")))
+        result["ping"] or result["arp_mac"] or open_ports or camera_discovery
     )
     return result
+
+
+def _annotate_replies(replies: list[dict[str, Any]], camera_ip: str) -> list[dict[str, Any]]:
+    for rep in replies:
+        src = rep.get("from", "")
+        rep["is_camera"] = src.rsplit(":", 1)[0] == camera_ip
+    return replies
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -224,16 +238,17 @@ def _print_text(r: dict[str, Any]) -> None:
     for port, resp in r.get("rtsp_options", {}).items():
         first_line = resp.splitlines()[0] if resp else ""
         print(f"  rtsp :{port}   : {first_line}")
-    ws = r.get("ws_discovery")
-    if ws is not None:
-        print(f"  ws-discovery : {len(ws)} repl{'y' if len(ws)==1 else 'ies'}")
-        for rep in ws:
-            print(f"      from {rep.get('from')} ({rep.get('bytes')} bytes)")
-    ssdp = r.get("ssdp")
-    if ssdp is not None:
-        print(f"  ssdp         : {len(ssdp)} repl{'y' if len(ssdp)==1 else 'ies'}")
-        for rep in ssdp:
-            print(f"      from {rep.get('from')} ({rep.get('bytes')} bytes)")
+    for proto, key in (("ws-discovery", "ws_discovery"), ("ssdp", "ssdp")):
+        replies = r.get(key)
+        if replies is None:
+            continue
+        cam = [x for x in replies if x.get("is_camera")]
+        other = [x for x in replies if not x.get("is_camera")]
+        note = "CAMERA RESPONDED" if cam else "camera silent"
+        print(f"  {proto:<12} : {note} ({len(cam)} from camera, "
+              f"{len(other)} from other LAN devices)")
+        for rep in cam:
+            print(f"      <- camera {rep.get('from')} ({rep.get('bytes')} bytes)")
 
 
 def main(argv: list[str] | None = None) -> int:
