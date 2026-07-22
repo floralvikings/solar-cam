@@ -1,0 +1,51 @@
+tests/test_udpflows.py
+  s_76f8a99bc79680::t_1f5ea4610ef90d 1-77
+scripts/pcaptools/analyze.py
+  s_76f8a99bc79680::t_31f10c0da1f856 1-215
+scripts/pcaptools/tshark.py
+  s_76f8a99bc79680::t_f104d53d00d0a5 1-265
+scripts/udp_flow_report.py
+  s_76f8a99bc79680::t_f270a9d2c91edb 1-115
+scripts/summarize_pcap.py
+  s_76f8a99bc79680::t_98131f23f9c9ca 1-92
+tests/test_tshark.py
+  s_76f8a99bc79680::t_f21c4c3f2b56e8 1-126
+scripts/pcaptools/report.py
+  s_76f8a99bc79680::t_49801cb5bc9205 1-226
+scripts/pcaptools/__init__.py
+  s_76f8a99bc79680::t_52b3a7369f6e30 1-24
+tests/test_compare.py
+  s_76f8a99bc79680::t_ee5f077547dc27 1-62
+tests/conftest.py
+  s_76f8a99bc79680::t_fe0eba7630e75d 1-10
+scripts/pcaptools/model.py
+  s_76f8a99bc79680::t_5793732b810f0a 1-132
+scripts/pcaptools/compare.py
+  s_76f8a99bc79680::t_1544d41194fa1c 1-113
+tests/test_analyze.py
+  s_76f8a99bc79680::t_ae4a932e697dc0 1-125
+scripts/compare_sessions.py
+  s_76f8a99bc79680::t_981ea327113279 1-129
+scripts/extract_dns.py
+  s_76f8a99bc79680::t_ac1b242e428289 1-86
+scripts/probe_camera.py
+  s_76f8a99bc79680::t_51aa1ef2e023d6 1-255
+scripts/pcaptools/udpflows.py
+  s_76f8a99bc79680::t_4cff0bb5bfbe87 1-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "7f10364dc7144d21ce7a103b7fb6cd15405d1a42",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
