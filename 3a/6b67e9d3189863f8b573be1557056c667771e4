@@ -1,0 +1,28 @@
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_d2804bf532e2ca 3-37,40-43,46-93,95-97,101-109
+docs/research-log.md
+  s_76f8a99bc79680::t_a35af636fc8dd1 13-77
+docs/cloud-dependencies.md
+  s_76f8a99bc79680::t_049e41686180e5 7-42,46-57,59,61-64,67-69,74-75
+docs/capture-procedure.md
+  s_76f8a99bc79680::t_72a8e3b04eecfa 103-118
+docs/network-behavior.md
+  s_76f8a99bc79680::t_1faaf29d0f658c 47-56
+  s_76f8a99bc79680::t_e564bf4f45df85 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3a6b67e9d3189863f8b573be1557056c667771e4",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
