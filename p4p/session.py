@@ -47,6 +47,50 @@ def build_lanstreamreq(uid: str, *, stream_index: int = 0) -> bytes:
     return build(MsgType.LAN_STREAM_REQ, bytes(body), aux=0x21)
 
 
+# --- Session keepalive + KCP (VERIFIED against the real decrypted session) ---
+# Upstream (client->camera): 0x1405 alive (aux 0x21) + 0x1409 KCP ACKs (aux 0x21).
+# Downstream (camera->client): 0x140a KCP PUSH video (aux 0x18) + 0x1406 keepalive.
+# The 32-bit conv is client-chosen (randomID); it appears in lanstreamreq
+# body[72], in the alive body[8:12], and as the first field of every KCP segment.
+ALIVE_AUX = 0x21
+KCP_AUX = 0x21
+VIDEO_AUX = 0x18
+IKCP_CMD_PUSH = 81
+IKCP_CMD_ACK = 82
+IKCP_CMD_WASK = 83
+IKCP_CMD_WINS = 84
+
+
+def build_alive(conv: int, *, channels: int = 0x0007) -> bytes:
+    """0x1405 session-alive. Body = u16 channels + pad + conv(u32 LE) + pad(8).
+
+    Verified real-session body: ``00 07 00 00 00 00 00 00 <conv LE> 00*8``.
+    ``channels`` (0x0007) selects the requested stream channels.
+    """
+    body = struct.pack("<H", channels) + b"\x00" * 6 + struct.pack("<I", conv) + b"\x00" * 8
+    return build(0x1405, body, aux=ALIVE_AUX)
+
+
+def build_kcp_segment(conv: int, cmd: int, *, frg: int = 0, wnd: int = 512,
+                      ts: int = 0, sn: int = 0, una: int = 0, payload: bytes = b"") -> bytes:
+    """Stock ikcp 24-byte header + payload (little-endian)."""
+    return struct.pack("<IBBHIIII", conv, cmd, frg, wnd, ts, sn, una, len(payload)) + payload
+
+
+def build_kcp_ack(conv: int, sn: int, una: int, **kw) -> bytes:
+    """0x1409 upstream message wrapping a KCP ACK segment."""
+    return build(0x1409, build_kcp_segment(conv, IKCP_CMD_ACK, sn=sn, una=una, **kw), aux=KCP_AUX)
+
+
+def parse_kcp_segment(body: bytes):
+    """Parse the KCP header from a 0x140a/0x1409 body. Returns a dict or None."""
+    if len(body) < 24:
+        return None
+    conv, cmd, frg, wnd, ts, sn, una, ln = struct.unpack_from("<IBBHIIII", body, 0)
+    return {"conv": conv, "cmd": cmd, "frg": frg, "wnd": wnd, "ts": ts,
+            "sn": sn, "una": una, "len": ln, "payload": body[24:24 + ln]}
+
+
 @dataclass
 class LanStreamResponse:
     """Parsed 0x1308 stream response: the camera's session endpoint."""

@@ -168,6 +168,36 @@ phone `.109:48447` ↔ camera `.113:50694`). Camera→phone video decoded cleanl
 conv at body[72] → `0x1308` → drive KCP (conv, wnd256, nodelay/10) over `0x140a`
 aux=0x18: send ACKs (cmd 82), `ikcp_input` the pushes, `ikcp_recv` → AV frames.
 
+### ✅ FULL upstream choreography (decrypted real session, 2026-07-23)
+
+The phone→camera direction was captured and decoded. The complete steady-state
+message set (all verified, implemented in `p4p.session`):
+
+| Dir | msgtype | aux | Contents |
+|-----|---------|-----|----------|
+| client→cam | **`0x1405` alive** | `0x21` | `00 07`(channels) `00*6` `<conv u32 LE>` `00*8` — **binds the session conv**, sent ~every 1–3 s |
+| client→cam | **`0x1409`** | `0x21` | KCP **ACK** (cmd 82), conv in the KCP header |
+| cam→client | **`0x140a`** | `0x18` | KCP **PUSH** (cmd 81) — H.264 video |
+| cam→client | **`0x1406`** | `0x18` | keepalive: `00 07` `00 00` `<devtoken u32>` `<conv>` `00*8` |
+
+- **conv** (e.g. `0xd8fd6437`) is the client's randomID; it appears in
+  `lanstreamreq` body[72], the `0x1405` alive body[8:12], and every KCP header.
+- KCP is stock ikcp; the client only sends ACKs upstream, camera only PUSHes.
+
+### ⛔ Remaining gap: the `lanstreamreq` stream descriptor
+
+Our client sends `lanstreamreq` (conv set) → gets `0x1308` (session opens) →
+sends the correct `0x1405` alive + `0x1409` ACKs, **but the camera still does not
+PUSH**. The captures are all mid-stream (session established beforehand), so the
+phone's actual `lanstreamreq` — specifically the 64-byte stream/channel
+descriptor at body[44:108] (`sess+0x108`) that we currently zero — was never
+seen. That descriptor (stream index / quality / channel setup) is almost
+certainly what makes the camera start streaming.
+
+**To finish:** capture a FRESH session start (force-close UBox so it tears down,
+start sniffer, then open UBox → live view) to record the phone's real
+`lanstreamreq` bytes; replicate them. Everything else in the pipeline is done.
+
 ## State machine (client peer side) — general (P2P/relay)
 
 1. **`p4p_mgmt_init`** — allocate the 4 crypto buffers (`p4p_crypto_init`), etc.
