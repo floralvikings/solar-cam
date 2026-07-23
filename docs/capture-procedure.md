@@ -175,6 +175,36 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 ---
 
+## Method E — Wi-Fi monitor capture on the Mac (for phone↔camera direct P2P)
+
+The live AV session is bridged in the Wi-Fi AP (invisible to router/switch), so
+to capture it we sniff 802.11 over the air and decrypt with the WLAN passphrase.
+
+Setup facts (this network): camera is 2.4 GHz-only, MAC `84:1d:e8:0e:b2:50`, on
+**channel 4** (the Mac associates there); Wi-Fi interface `en0`.
+
+1. **Sniff (built-in macOS tool, no install):** Option-click the Wi-Fi menu bar
+   icon → *Open Wireless Diagnostics…* → menu *Window → Sniffer* → Channel **4**,
+   Width **20 MHz** → *Start*. (The Mac drops off Wi-Fi while sniffing.) It saves
+   a `.pcap` (shows the path on stop; usually Desktop or `/var/tmp`).
+2. **Force handshakes + traffic** during the sniff (needed to decrypt): toggle
+   the **phone** Wi-Fi off/on; power-cycle the **camera** if easy; then open
+   **live view + pan ~60 s** in UBox. Stop the sniffer.
+3. **Decrypt locally** (keeps the passphrase on your machine):
+   ```bash
+   airdecap-ng -e "SSID" -p "WIFI_PASSWORD" /path/to/sniff.pcap   # -> sniff-dec.pcap
+   ```
+4. Copy the decrypted pcap into `captures/` for analysis.
+5. **Verify** if a decrypt looks empty:
+   ```bash
+   tshark -r sniff.pcap -Y eapol | wc -l                          # want >=4 (handshakes)
+   tshark -r sniff.pcap -Y 'wlan.addr==84:1d:e8:0e:b2:50' | head  # camera present?
+   ```
+   If the camera is absent, it's on another channel — retry the sniffer on 1/6/11.
+
+Fallback if the built-in Sniffer is unavailable: `brew install --cask wireshark`
+(monitor mode + channel selector + live decryption in the GUI).
+
 ## Method C — MikroTik sniffer → live stream to Wireshark on the Mac
 
 Router streams matching packets (TZSP, UDP/37008) to the Mac; Wireshark
