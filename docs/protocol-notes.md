@@ -66,14 +66,27 @@ Observations:
 The low control-plane entropy is the encouraging part: control/command packets
 look reversible. The media stream will be the hard part.
 
-## Known-platform comparison
+## Platform: **rebranded ThroughTek TUTK** — **Confirmed** (APK, 2026-07-23)
 
-UDP **10240** to a rendezvous pool plus a separate media port is consistent
-with several Chinese P2P camera SDKs (TUTK/Kalay, PPPP/CS2, PPStrong). The
-16-byte fixed header with an embedded UID matches that family's general shape.
-**Not yet identified** — confirm by decompiling the UBox APK and looking for
-the bundled native P2P SDK (`libPPPP`, `libIOTCAPIs`, `libtutk`, ...).
-Tag: **Possible.**
+The UBox APK bundles `libUBICAPIs.so`, a TUTK fork (`IOTC_*` → `UBIC_*`), with
+the literal string `com/tutk/IOTC/st_LanSearchInfo2` and matching `IOTC_ER_*`
+error codes. See `apk-analysis.md` for the full evidence, the `p4p_*` API, and
+the **494-constant command table** (`AVIOCTRLDEFs.java`) giving the PTZ,
+streaming, playback, and file-download opcodes.
+
+⇒ The observed UDP 10240 rendezvous + UDP 20001 media pattern is the TUTK
+IOTC/AVAPI session model: `UID → rendezvous → deviceSID/clientSID → AV channel`.
+
+### Local (cloud-free) operation looks viable — **Strongly indicated**
+The SDK defines `CLI_SESSION_LAN = 5` alongside `CLI_SESSION_P2P = 4`, exposes
+`p4p_mgmt_setnetmode()`, and the camera side implements
+`p4p_device_handle_lansearchreq` — i.e. **the camera answers a proprietary UDP
+LAN-discovery broadcast**. That is why SSDP/ONVIF/mDNS probes found nothing:
+we were speaking the wrong protocol, not talking to a silent device.
+
+**Next test:** capture the UBox app performing a LAN search (phone *and* camera
+on the same LAN) to recover the discovery port and packet bytes, then replay it
+from `probe_camera.py`.
 
 ## Connectivity-check loop (noise, not protocol) — **Confirmed**
 

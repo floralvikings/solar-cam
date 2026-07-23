@@ -10,6 +10,53 @@ Possible / Unknown**.
 
 ---
 
+## 2026-07-23 — UBox APK: SDK is a rebranded TUTK; LAN mode exists
+
+**Conditions:** APK pulled via `adb` from an owned Galaxy S23 Ultra
+(`cn.ubia.ubox`): `base.apk` 60 MB + `split_config.arm64_v8a.apk` 90 MB.
+Decompiled with jadx (10,830 java files); native libs inspected via `strings`.
+
+**Observed (facts):**
+- Bundled P2P SDK is **`libUBICAPIs.so` — a rebranded ThroughTek TUTK**:
+  the binary still contains `com/tutk/IOTC/st_LanSearchInfo2`; JNI exports are
+  TUTK's `IOTC_*` renamed to `UBIC_*`; `IOTC_ER_*` error codes match TUTK's.
+- `p4p_*` API includes `startvideo/startaudio/startspeak`,
+  `send_ioctrl`, `send_avcommand`, `startlansearch`, `setnetmode`.
+- Internal symbols include **`p4p_device_handle_lansearchreq`** (device side of
+  LAN discovery) and `p4p_device_handle_preconnectreq`.
+- `UBICAPIs.java` defines **`CLI_SESSION_LAN = 5`** (vs `CLI_SESSION_P2P = 4`),
+  `CLI_SESSION_WAKEUP = 1`, `CLI_WRONG_VIEWACCPWD = -2005`.
+- `com/ubia/IOTC/AVIOCTRLDEFs.java` holds **494 command constants**: full PTZ
+  set (`PTZ_STOP=0, UP=1, DOWN=2, LEFT=3, RIGHT=6`, presets, cruise), stream
+  control (800–809), playback (`RECORD_PLAY_START=16`), file/event download
+  (4864–4877), `IOTYPE_UBIA_SET_UID_REQ=241`.
+- SDK-embedded endpoints: `portal{,.us,.cn}.ubianet.com`, `oam.ubianet.com`,
+  `d.ubianet.com`, `d.ntp.ubianet.com`, and regional media buckets
+  `ubiasnap-{as,eu,us}.oss-*.aliyuncs.com` / `.s3-*.amazonaws.com`.
+- `www.amazon.com` is embedded **in the SDK** → the connectivity-check loop
+  seen in the idle capture is SDK behavior, not app behavior.
+
+**Interpretation:**
+- Platform is TUTK-derived. Tag: **Confirmed.** This is a large win — the
+  TUTK IOTC/AVAPI model is publicly documented, so the remaining work is
+  mapping a known protocol rather than reversing an unknown one.
+- **A cloud-free LAN session is plausible**: LAN session type + `setnetmode` +
+  a device-side LAN-search handler. Tag: **Strongly indicated** (not yet
+  demonstrated against this camera).
+- Earlier "no local services" stands for *standard* protocols only — the camera
+  likely listens for the **proprietary** p4p LAN-search broadcast, which our
+  probe never sent. Correction of emphasis, not of fact.
+- Auth will need the device **UID** + a view account/password
+  (`CLI_WRONG_VIEWACCPWD`).
+
+**Next experiment:**
+1. Capture the UBox app doing a **LAN search** with phone **and** camera on the
+   same LAN → recover the discovery UDP port + request/response bytes.
+2. Replay that probe from `probe_camera.py`; confirm the camera answers.
+3. Then attempt a LAN session and the `send_ioctrl` PTZ opcodes.
+
+---
+
 ## 2026-07-22 — First idle capture: platform identified as UBIA
 
 **Conditions:** MikroTik sniffer→file, filtered to `192.168.88.113`. Camera
