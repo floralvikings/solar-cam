@@ -56,10 +56,45 @@ LAN-search (32762)  →  parse LanSearchInfo (deviceSID, addrs)
 wins), and its body memcpy's the UID (20B) plus 16-byte session/stream structs
 taken from the LanSearchInfo. `getnetmode` gates LAN vs relay.
 
-**This is the whole recipe for first video.** Remaining to pin: the exact
-`lanstreamreq` body byte layout (which LanSearchInfo fields go where) and the
-KCP receive side (`handle_lanstreamrsp` → frames). The general flow below still
-applies to P2P/relay (off-LAN) operation.
+**This is the whole recipe for first video.** The general flow below applies to
+P2P/relay (off-LAN) only.
+
+### `lanstreamreq` packet layout — from `send_lanstreamreq` disassembly
+
+Header (standard 16-byte, then whole packet obfuscated by `send_udp`):
+```
+magic 07181000 | len 0x006c (108) | flags 0x0000 | msgtype 0x1307 | aux 0x0021 | resv 0x00000000
+```
+Total = 16 + 108 = **124 bytes**. `aux=0x21` and `body[0]=0x01` are constants for
+the stream-start request.
+
+Body (108 bytes) is copied from the device-session struct `sess` (populated by
+`handle_lansearchrsp` from the LAN-search reply). Field map (body offsets):
+| body[] | size | source | meaning (inferred) |
+|--------|------|--------|--------------------|
+| 0 | 1 | const `0x01` | stream on |
+| 3 | 1 | `sess+0x17` | ? |
+| 24..44 | 20 | `sess+0xe4` | **device UID** |
+| 44..108 | 64 | `sess+0x108` | session/stream/address block |
+| 65 | 1 | `sess+0xe0` | ? |
+| 66 | 1 | `sess+0x06` | ? |
+| 72..76 | 4 | `sess+0x0c` | u32 (session id / randomID?) |
+| 76..92 | 16 | `sess+0xf8` | 16B block (overwrites part of the 64B) |
+| 92 | 1 | 9 or 0 | device-type dependent |
+| 94 | 1 | `sess+0xe1` | ? |
+| 100..104 | 4 | `sess+0x128` | u32 (stream index / quality?) |
+
+Sent via `p4p_send_udp` (obfuscates) to the camera's LAN addr, pub addr, and —
+per `getnetmode` — a third target (relay). On-LAN, the LAN addr is used.
+
+**To pin next:** the `sess` fields come from the LAN-search reply. Map the
+reply→`sess` parsing in `handle_lansearchrsp` to fill these from the
+`LanSearchInfo` we already decode; the `sess+0x108` block is likely the
+device's address/stream descriptor echoed from the reply. Then send a candidate
+`lanstreamreq` to the camera and read the response (`handle_lanstreamrsp`) — our
+own Mac↔camera traffic is visible, so we can iterate empirically.
+
+Remaining after that: the KCP receive side (`handle_lanstreamrsp` → KCP frames).
 
 ## State machine (client peer side) — general (P2P/relay)
 
