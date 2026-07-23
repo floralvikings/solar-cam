@@ -1,0 +1,23 @@
+docs/apk-analysis.md
+  s_76f8a99bc79680::t_e8cd918cbba086 85-185
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_aaa3187481c0a4 69-89
+docs/research-log.md
+  s_76f8a99bc79680::t_ef21d619e42a7e 13-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "a4f7339de4e1c87c4d9ef08f24d23675aa4944f6",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
