@@ -19,7 +19,9 @@ PLATFORMS: list[Platform] = [Platform.CAMERA]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up RBX-S73 from a config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = RbxS73Device(hass, entry)
+    device = RbxS73Device(hass, entry)
+    await device.async_setup()  # register the go2rtc stream, resolve RTSP URL
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = device
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -28,5 +30,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        device: RbxS73Device = hass.data[DOMAIN].pop(entry.entry_id, None)
+        if device:
+            await device.async_teardown()
     return unloaded
