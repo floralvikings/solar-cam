@@ -29,6 +29,15 @@ AUDIO_TYPE = 0x13
 LAN_SEARCH_PORT = 32762
 
 
+def _has_sps(frame: bytes) -> bool:
+    i = frame.find(b"\x00\x00\x00\x01")
+    while i >= 0:
+        if (frame[i + 4] & 0x1F) == 7:  # SPS
+            return True
+        i = frame.find(b"\x00\x00\x00\x01", i + 4)
+    return False
+
+
 def extract_h264(message: bytes) -> bytes | None:
     """Return the Annex-B H.264 from a video message, or None (audio/other).
 
@@ -53,12 +62,15 @@ def stream_h264(
     conv: int | None = None,
     port: int = LAN_SEARCH_PORT,
     warmup_timeout: float = 15.0,
+    key_start: bool = True,
 ) -> Iterator[bytes]:
     """Yield Annex-B H.264 frames from the camera over the LAN.
 
     ``password`` defaults to the credential the camera returns in its
     LanSearchInfo. ``client_ip`` is our LAN IP (where the camera streams video).
-    Runs until the generator is closed or the socket errors.
+    With ``key_start`` (default) the first yielded frame is a keyframe (SPS), so
+    a downstream decoder/muxer (ffmpeg, go2rtc) syncs cleanly. Runs until the
+    generator is closed or the socket errors.
     """
     infos = discover(uid, targets=[broadcast, camera_ip], timeout=warmup_timeout)
     if not infos:
@@ -102,6 +114,7 @@ def stream_h264(
     sess_port = rsp.session_port
     kcp = KcpReceiver(conv)
     last_alive = 0.0
+    synced = not key_start
     try:
         # kick the stream
         for _ in range(3):
@@ -129,8 +142,13 @@ def stream_h264(
             kcp.input(pkt.body)
             for msg in kcp.messages():
                 frame = extract_h264(msg)
-                if frame:
-                    yield frame
+                if not frame:
+                    continue
+                if not synced:
+                    if not _has_sps(frame):
+                        continue  # wait for the first keyframe (SPS)
+                    synced = True
+                yield frame
             # ACK what we received so the camera keeps sending
             acks = kcp.ack_segments()
             for i in range(0, len(acks), 8):  # pack a few ACK segs per 0x1409
