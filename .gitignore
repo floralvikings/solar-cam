@@ -16,6 +16,12 @@ captures/*
 apk/
 jadx-output/
 apktool-output/
+# Repackaging toolchain artifacts (large binaries / decompiled trees).
+# tools/hook.js is kept; the jars/apks/decompiled dirs are not.
+tools/*.jar
+tools/splits/
+tools/ubox-dec/
+tools/*-dec/
 
 # Firmware images and extractions
 firmware/*
