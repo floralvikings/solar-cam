@@ -1,0 +1,24 @@
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_d0dbf0d91c8bd8 173-219
+docs/cloud-dependencies.md
+  s_76f8a99bc79680::t_044eee6a33fc94 51-55
+docs/research-log.md
+  s_76f8a99bc79680::t_fe3729192573df 57,63-95
+  s_76f8a99bc79680::t_32cb73a466a551 96-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9e24327495f639fa1a03bfac4be2c9fae7275e3c",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
