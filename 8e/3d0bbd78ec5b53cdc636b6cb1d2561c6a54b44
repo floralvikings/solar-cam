@@ -1,0 +1,23 @@
+docs/session-flow.md
+  s_76f8a99bc79680::t_4ae0197d29e5f3 39-64
+docs/bridge-design.md
+  s_76f8a99bc79680::t_04067abc4b72e6 26-38
+docs/research-log.md
+  s_76f8a99bc79680::t_cc92c6190515ce 188-220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "8e3d0bbd78ec5b53cdc636b6cb1d2561c6a54b44",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
