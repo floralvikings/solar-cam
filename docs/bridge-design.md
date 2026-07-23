@@ -23,6 +23,19 @@ p4p bridge daemon (Docker, on camera VLAN)      ← this repo's p4p/ package
 go2rtc / MediaMTX  ── RTSP / WebRTC ──►  Home Assistant  /  Frigate
 ```
 
+## Multi-camera (design requirement)
+
+More RBX-S73 cameras may be added later, so the bridge is **multi-camera from
+the start**: a list of camera configs (each with its own UID/credential/IP/
+stream), one independent `p4p` session per camera, each fronted as its own
+go2rtc stream (e.g. `rbx-<name>`). Discovery is per-UID (LAN-search names the
+UID), so multiple cameras coexist on the same VLAN without collision. The daemon
+supervises N sessions with independent reconnect/health.
+
+```
+cameras: [ {name, uid(secret), ip, stream}, ... ]  →  N p4p sessions  →  N go2rtc streams
+```
+
 ## Bridge daemon responsibilities (Phase 3)
 
 - Wrap the `p4p` client: discover → connect → `start_video()` → yield H.264.

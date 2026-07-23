@@ -185,12 +185,39 @@ against the real device. The remaining unknowns are all in the session layer
 (preconnect body, KCP conv, lanstreamreq) — to be pinned by driving our own
 client and capturing Mac↔camera traffic.
 
-**Next experiment (Phase 2b):**
-1. Implement + send the preconnect/PUNCH2LAN (candidate 0x110A) to the camera;
-   capture our own Mac↔camera traffic to confirm the reply and pin the body.
-2. Wrap a KCP library (conv = randomID); send `lanstreamreq`; receive H.264.
-3. Phase 3: bridge daemon → go2rtc/MediaMTX → RTSP → Home Assistant; then
-   Phase 4 VLAN lockdown (camera → bridge/HA only).
+**Next experiment (Phase 2b):** in progress — see next entry.
+
+---
+
+## 2026-07-23 — Phase 2b: LAN session flow is SHORT (no preconnect)
+
+**Conditions:** static analysis of `libUBICAPIs.so` (call-resolved disassembly of
+`p4p_client_handle_lansearchrsp` and `p4p_client_send_lanstreamreq`).
+
+**Observed (facts):**
+- `handle_lansearchrsp`'s final call is **directly `p4p_client_send_lanstreamreq`**
+  — on the LAN there is **no separate preconnect/knock/login**; those exist only
+  for P2P/relay NAT traversal (`send_lanwakeupreq`, `send_knock`, `send_loginreq`,
+  hello family all exist but are off-LAN).
+- `send_lanstreamreq` writes **msgtype `0x1307`** (confirms candidate), sends via
+  `p4p_send_udp` to the camera (LAN + pub addrs; `getnetmode` selects), body
+  memcpy's the UID (20B) + 16-byte session/stream structs from the LanSearchInfo.
+- `0x1807` (recurring in every builder) is a **buffer size**, not a header field.
+
+**Interpretation:**
+- **LAN video recipe = `LAN-search → lanstreamreq(0x1307) → H.264 over KCP`.**
+  Much shorter than feared; the reply carries `deviceSID`+addrs the stream req
+  needs. Tag: **Confirmed** (flow); body layout **to pin**.
+
+**User input:** more of these cameras may be added later → bridge is designed
+**multi-camera** (N sessions → N go2rtc streams); recorded in `bridge-design.md`.
+
+**Next experiment:**
+1. Extract the exact `lanstreamreq` body layout (which LanSearchInfo fields map
+   where) from `send_lanstreamreq` + the reply-parsing in `handle_lansearchrsp`.
+2. Implement `send_lanstreamreq` in `p4p.session`; send to the camera; capture
+   our own Mac↔camera traffic to confirm and read the stream response.
+3. Decode `handle_lanstreamrsp` + KCP receive → first H.264 frame.
 
 ---
 

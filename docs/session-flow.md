@@ -36,7 +36,32 @@ The SDK explicitly distinguishes, in `STREAMREQ_COST` logging and code paths:
 | P2P | (hole-punched) | | different NATs, direct |
 | RLY | `p4p_client_send_rlystreamreq` | `p4p_device_handle_rlystreamreq` | fallback via cloud relay |
 
-## State machine (client peer side)
+## ⚡ Simplified LAN path — **Confirmed** (2026-07-23, from `handle_lansearchrsp`)
+
+On the **LAN**, the connection is far shorter than the general P2P flow below.
+Disassembly of `p4p_client_handle_lansearchrsp` shows that after it parses the
+reply, stores the device addresses, and starts a timer, its **final action is a
+direct call to `p4p_client_send_lanstreamreq`** — there is **no separate
+preconnect / knock / login on the LAN path** (those exist for NAT traversal in
+P2P/RLY mode). The LAN-search reply already carries `deviceSID` + addresses.
+
+```
+LAN-search (32762)  →  parse LanSearchInfo (deviceSID, addrs)
+                    →  send_lanstreamreq (msgtype 0x1307, UDP → camera)
+                    →  camera streams H.264 over KCP
+```
+
+`p4p_client_send_lanstreamreq` (verified): writes **msgtype `0x1307`**, sends via
+`p4p_send_udp` to the camera (it tries LAN + pub addrs; on-LAN the LAN addr
+wins), and its body memcpy's the UID (20B) plus 16-byte session/stream structs
+taken from the LanSearchInfo. `getnetmode` gates LAN vs relay.
+
+**This is the whole recipe for first video.** Remaining to pin: the exact
+`lanstreamreq` body byte layout (which LanSearchInfo fields go where) and the
+KCP receive side (`handle_lanstreamrsp` → frames). The general flow below still
+applies to P2P/relay (off-LAN) operation.
+
+## State machine (client peer side) — general (P2P/relay)
 
 1. **`p4p_mgmt_init`** — allocate the 4 crypto buffers (`p4p_crypto_init`), etc.
 2. **`p4p_client_randomID`** — client generates a 32-bit `randomID` (the session
