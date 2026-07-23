@@ -114,8 +114,37 @@ which the camera streams H.264. Implemented in `p4p.session`
 (`build_lanstreamreq`, `parse_lanstreamrsp`).
 
 **So even a near-empty stream request works** — the camera only needs the UID to
-start a session. Next: `handle_lanstreamrsp` to learn what the client sends to
-the session port (KCP conv/handshake) to make video flow.
+start a session.
+
+### KCP transport recipe — from the SDK (2026-07-23)
+
+After `0x1308`, video flows over **KCP (ikcp)** carried **inside obfuscated P4P
+`0x140a` frames** (this is why the idle-capture `0x140a` decoded as P4P but had a
+high-entropy body — the body is a KCP segment wrapping H.264):
+
+```
+wire:  p4p obfuscate( header(msgtype 0x140a) + KCP segment( H.264 / AV ) )
+```
+
+- **KCP conv** = `avchn[0xc]` (`ikcp_create` arg in `p4p_client_add_avchn`) — the
+  per-channel session id; candidate = the `session_id` from `0x1308` (`0xf82b`).
+- **KCP config** (`p4p_kcp_mode`): `ikcp_wndsize(snd=128, rcv=256)`,
+  `ikcp_nodelay(interval=10ms, …)`. Match these for interop.
+- KCP segment header (stock ikcp, LE):
+  `conv(4)|cmd(1)|frg(1)|wnd(2)|ts(4)|sn(4)|una(4)|len(4)` then payload.
+- `p4p_kcp_input` feeds received `0x140a` bodies into `ikcp_input`;
+  `ikcp_recv` yields the reassembled AV stream.
+
+**Remaining to first video (Phase 2b tail):**
+1. Wrap/vendor a KCP (stock ikcp; conv=session_id, wnd 128/256, nodelay/10ms).
+2. To "connect": send a P4P `0x140a` frame containing an initial KCP segment
+   (conv=session_id) to the camera's session port so it learns our return
+   address and starts pushing video KCP.
+3. `ikcp_input` the incoming `0x140a` bodies → `ikcp_recv` → strip AV framing →
+   **H.264 elementary stream** → go2rtc.
+
+Status: camera reaches "session open, retransmitting 0x1308" with our current
+client; the KCP connect is the last unimplemented step.
 
 ## State machine (client peer side) — general (P2P/relay)
 
