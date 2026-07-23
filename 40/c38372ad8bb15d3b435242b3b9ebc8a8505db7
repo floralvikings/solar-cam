@@ -1,0 +1,23 @@
+tests/test_p4p_session.py
+  s_76f8a99bc79680::t_259664b8dc8441 1-49
+docs/session-flow.md
+  s_76f8a99bc79680::t_4d7e321654bd9c 99-119
+p4p/session.py
+  s_76f8a99bc79680::t_82bfadd9821c12 19,23,25-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "40c38372ad8bb15d3b435242b3b9ebc8a8505db7",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
