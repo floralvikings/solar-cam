@@ -1,8 +1,10 @@
-"""Camera entity for the RBX-S73. Streams via go2rtc; no cloud."""
+"""Camera entity for the RBX-S73. Local MJPEG (H.264->ffmpeg->MJPEG); no cloud."""
 
 from __future__ import annotations
 
-from homeassistant.components.camera import Camera, CameraEntityFeature
+from aiohttp import web
+
+from homeassistant.components.camera import Camera
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -23,11 +25,12 @@ async def async_setup_entry(
 
 
 class RbxS73Camera(Camera):
-    """A SEHMUA RBX-S73 camera served locally via go2rtc."""
+    """A SEHMUA RBX-S73 camera served locally as MJPEG."""
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_supported_features = CameraEntityFeature.STREAM
+    # No STREAM feature: HA serves the camera via MJPEG (handle_async_mjpeg_stream)
+    # and stills (async_camera_image), both backed by the shared pipeline.
 
     def __init__(self, device: RbxS73Device) -> None:
         super().__init__()
@@ -40,9 +43,14 @@ class RbxS73Camera(Camera):
             model="RBX-S73",
         )
 
-    async def stream_source(self) -> str | None:
-        """Return the RTSP URL go2rtc serves (HA native stream + go2rtc open it).
+    async def async_camera_image(
+        self, width: int | None = None, height: int | None = None
+    ) -> bytes | None:
+        """Return a single JPEG frame (shared with the live stream)."""
+        return await self._device.stream.snapshot()
 
-        Registers the stream with go2rtc lazily on first request.
-        """
-        return await self._device.async_stream_url()
+    async def handle_async_mjpeg_stream(
+        self, request: web.Request
+    ) -> web.StreamResponse:
+        """Serve the live MJPEG stream."""
+        return await self._device.stream.mjpeg_response(request)

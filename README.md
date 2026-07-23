@@ -10,28 +10,24 @@ This README covers how to *use* the tooling in this repo.
 
 `custom_components/rbx_s73/` is a HACS custom integration that streams the camera
 **locally, cloud-free**, decoding on the HA host (pure-Python `p4p` client is
-vendored inside it). **Requires go2rtc** (bundled in HA 2024.11+), which owns the
-single AV session by exec'ing the vendored `capture.py`.
+vendored inside it). **Self-contained — no go2rtc required.** The camera's
+H.264 is captured by `capture.py` and transcoded to **MJPEG** by ffmpeg (present
+on HA OS), which Home Assistant serves natively for both live view and snapshots.
 
 **Install:** HACS → Custom repositories → add this repo (type *Integration*) →
 install → restart HA → Settings → Devices → Add Integration → *RBX-S73*. Enter
 the camera IP and 20-char UID (the view password is auto-discovered). HA must be
 on the same LAN as the camera.
 
-The camera entity returns a go2rtc `exec:` source
-(`capture.py | ffmpeg → rtsp {output}`). If your HA build doesn't accept an
-`exec:` source from a camera, use the **manual fallback**: add to go2rtc config
+**How it works:** the camera serves only **one AV session at a time**, so the
+integration runs a single shared `capture.py | ffmpeg` pipeline and fans the
+MJPEG frames out to every viewer plus snapshots. The pipeline starts on first
+view and stops a few seconds after the last viewer leaves, so the (solar/battery)
+camera only streams while something is watching. Don't run UBox live view against
+the same camera at the same time.
 
-```yaml
-streams:
-  rbx_s73: "exec:sh -c 'python3 /config/custom_components/rbx_s73/capture.py \
-    --uid <UID> --camera-ip <CAM_IP> --client-ip <HA_IP> -o - | \
-    ffmpeg -f h264 -framerate 15 -i pipe:0 -c copy -rtsp_transport tcp -f rtsp {output}'"
-```
-
-and point the Generic Camera integration at it. **Only one session per camera** —
-don't run UBox live view against the same camera at the same time. PTZ and a
-cleaner keyframe-aligned extraction are planned follow-ups.
+Trade-off: MJPEG is heavier on LAN bandwidth and carries no audio. An optional
+H.264-passthrough path (go2rtc/WebRTC) and PTZ controls are planned follow-ups.
 
 ## Status
 

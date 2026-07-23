@@ -1,8 +1,8 @@
 """SEHMUA RBX-S73 local camera integration (cloud-free, LAN P4P).
 
-go2rtc (bundled in Home Assistant) owns the single AV session by exec'ing the
-vendored capture.py; this integration provides the camera entity and the
-go2rtc source string.
+The camera's proprietary P4P/H.264 stream is captured by a vendored pure-Python
+client and transcoded to MJPEG by ffmpeg on the HA host, then served natively
+by Home Assistant. No cloud, no go2rtc dependency.
 """
 
 from __future__ import annotations
@@ -18,11 +18,7 @@ PLATFORMS: list[Platform] = [Platform.CAMERA]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up RBX-S73 from a config entry.
-
-    The go2rtc stream is registered lazily on first stream request (go2rtc may
-    not be up yet at setup time), so setup just stores the device.
-    """
+    """Set up RBX-S73 from a config entry."""
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = RbxS73Device(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -34,5 +30,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded:
         device: RbxS73Device = hass.data[DOMAIN].pop(entry.entry_id, None)
         if device:
-            await device.async_teardown()
+            await device.async_stop()
     return unloaded
