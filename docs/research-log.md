@@ -213,11 +213,25 @@ client and capturing Mac↔camera traffic.
 exact **connect/ack + KCP conv/framing** is not yet right. Blind probing has hit
 diminishing returns. Tag: **blocked** on ground truth.
 
-**Decision needed (fastest path):** obtain a ground-truth capture of the *real
-app's* session-port handshake — via Wi-Fi monitor-mode capture (needs the WLAN
-PSK to decrypt) or Frida on the phone (dump the SDK's exact send bytes) — vs.
-continue deep static RE of `handle_lanstreamrsp` + KCP framing. See
-`docs/session-flow.md` for the full recipe.
+**UPDATE — Wi-Fi monitor capture (decrypted) cracked the video params but not
+the connect:**
+- Captured+decrypted the real session (`rbx-realsession.pcap`, phone `.109:48447`
+  ↔ camera `.113:50694`). Confirmed: video = P4P **0x140a aux=0x18** carrying
+  **KCP** (cmd 81 PUSH, wnd 256), **conv is client-chosen** = `sess+0xc` placed
+  in `lanstreamreq` **body[72]** (was zero in our probe → camera never pushed).
+  AV frames carry a `0x13` header (timestamp + framelen).
+- BUT the capture caught the session **mid-stream** (KCP sn already 251) and only
+  the **camera→phone** direction decrypted (macOS monitor loss + we only hold the
+  phone's handshake). The **phone→camera connect/ack of 0x1308** — the last
+  packet we need — was not captured.
+- Retesting our client with conv at body[72] + KCP to the session port still
+  yields only 0x1308 retransmits: the camera awaits a specific ack we don't have.
+
+**Fastest path now:** one more monitor capture that catches the **session
+START** — start the sniffer FIRST, then open live view fresh — so the phone→
+camera connect handshake is on the wire (KCP sn from 0). Alternatively continue
+deep static RE of `handle_lanstreamrsp`→`send_alive` body. Full recipe +
+remaining gap in `docs/session-flow.md`.
 
 ---
 
