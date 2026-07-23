@@ -2,14 +2,36 @@
 
 Architecture decisions (2026-07-23) and the plan for the local bridge daemon.
 
-## Decision
+## Decision (updated 2026-07-23 — run on the HA box)
 
-- **Output:** the bridge exposes an **H.264 RTSP** stream via **go2rtc/MediaMTX**;
-  Home Assistant consumes it through the Generic Camera / go2rtc integration,
-  and Frigate can use the same stream. (A native custom HA component with PTZ
-  entities can be layered on later — not required for first light.)
-- **Deployment:** a small **Docker** daemon on a **Linux server with an interface
-  on the camera's isolated VLAN**. Config via env/secrets; no cloud dependency.
+- **Deployment (revised):** a **HACS custom integration** that runs the
+  **pure-Python `p4p` client + KCP receiver ON the Home Assistant device** — no
+  separate daemon. The whole stack (`p4p.client.stream_h264`) is pure Python
+  specifically so it installs and runs inside HA. User "adds the HACS repo" and
+  configures the camera in the HA UI.
+- **Output:** the integration hands the decoded **H.264** to HA's bundled
+  **go2rtc** (HA ships go2rtc), which restreams as RTSP/WebRTC/HLS to the
+  frontend and to Frigate. (Original plan — a standalone Docker daemon on the
+  camera VLAN — remains a valid alternative if HA can't reach the camera VLAN.)
+
+### HACS integration shape (Phase 3, to build)
+```
+custom_components/rbx_s73/
+  __init__.py, manifest.json (hacs.json at repo root)
+  config_flow.py     # UI: camera IP + UID; password auto-discovered from LanSearchInfo
+  camera.py          # Camera entity; stream via HA stream/go2rtc
+  coordinator.py     # runs p4p.client.stream_h264 in an executor/async task
+```
+- Config: camera IP + UID (the view password is auto-discovered from the
+  camera's LanSearchInfo, so the user need not enter it).
+- Feed H.264 to go2rtc (e.g. an `exec:` source running `scripts/capture_h264.py`,
+  or push frames into HA's stream worker).
+- Constraint: **one session per camera** — the integration owns the session, so
+  don't run UBox live view against the same camera simultaneously.
+- Later: PTZ via `send_ioctrl` + the `AVIOCTRLDEFs` opcodes as HA buttons/services.
+
+Reference client already built: `p4p.client.stream_h264` + `scripts/capture_h264.py`
+(verified: 640x360 H.264 decoded by ffmpeg, cloud-free).
 
 ## Target architecture
 

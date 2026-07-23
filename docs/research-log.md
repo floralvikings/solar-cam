@@ -189,6 +189,43 @@ client and capturing Mac↔camera traffic.
 
 ---
 
+## 2026-07-23 — 🎥 LOCAL VIDEO WORKS end-to-end; H.264 in ffmpeg
+
+**Conditions:** our pure-Python client vs the live camera; camera free (UBox
+live view closed).
+
+**Done (facts):**
+- **Auth solved via Frida** (repackaged UBox with frida-gadget). The real
+  `lanstreamreq` has the view password (= the LanSearchInfo credential) at
+  **body[44:60]** and account `admin` at **body[76:92]** — I'd swapped them.
+- Camera authenticates → pushes **H.264 over KCP (0x140a)** to our client.
+- Implemented pure-Python **`p4p.kcp`** (receive/reassemble/ACK) + **`p4p.client.
+  stream_h264`** + **`scripts/capture_h264.py`**. Video = message type 0x11
+  (32-byte AV header + Annex-B H.264); audio = 0x13 (skipped).
+- **Verified in ffmpeg:** captured live, decoded **640×360** frames (126 frames
+  in 12 s via our CLI). Minor decode warnings from mid-GOP start — refinement,
+  not a protocol issue. 87 tests pass.
+
+**Interpretation:** the full cloud-free local video path is proven and
+reproducible from our own code. Tag: **Confirmed.**
+
+**Next:** (1) tidy frame extraction (use AV-header framelen; start on a
+keyframe) for a clean go2rtc feed; (2) **HACS custom integration** running the
+pure-Python client on the HA box → go2rtc (see `bridge-design.md`); (3) PTZ via
+`send_ioctrl`; (4) VLAN lockdown.
+
+**Future research goals (user-requested):**
+- **App-free Wi-Fi provisioning.** New cameras are set up via the UBox app over
+  **BLE** (phone Bluetooth → camera) to hand over the Wi-Fi SSID/password. Goal:
+  reverse that BLE provisioning so future cameras can be onboarded without the
+  app. The **never-powered-on 2nd camera** is the ideal subject — sniff the BLE
+  GATT traffic during a real app binding once, reverse the characteristic
+  writes, then reproduce. (Distinct sub-project; needs BLE capture, e.g. Android
+  HCI snoop log or a BLE sniffer.)
+- That 2nd camera is also the spare to bind directly onto the isolated VLAN.
+
+---
+
 ## 2026-07-23 — Phase 2b: session opens; KCP connect is the blocker
 
 **Conditions:** driving our `p4p` client against the live camera from the Mac
