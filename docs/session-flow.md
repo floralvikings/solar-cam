@@ -96,6 +96,27 @@ own Mac↔camera traffic is visible, so we can iterate empirically.
 
 Remaining after that: the KCP receive side (`handle_lanstreamrsp` → KCP frames).
 
+### ✅ VERIFIED LIVE (2026-07-23): camera accepts `lanstreamreq`, opens session
+
+Sent a candidate `lanstreamreq` (msgtype 0x1307, aux 0x21, body = const `0x01` +
+UID, rest zero) to the camera at `:32762`. The camera **accepted it** and
+replied **msgtype `0x1308`** from a **freshly-opened session UDP port**, body:
+```
+b[12:16] = camera LAN IP        (c0 a8 58 71 = 192.168.88.113)
+b[16:18] = session port (BE)    (d1 40 = 53568; ephemeral per session)
+b[24:28] = session id           (2b f8 00 00; candidate KCP conv)
+b[28:48] = UID (echo)
+b[48:52] = 00 00 00 01          (flag/count)
+```
+The camera **retransmits `0x1308` until the client connects** to that session
+port — i.e. the next step is the **KCP handshake on the session port**, after
+which the camera streams H.264. Implemented in `p4p.session`
+(`build_lanstreamreq`, `parse_lanstreamrsp`).
+
+**So even a near-empty stream request works** — the camera only needs the UID to
+start a session. Next: `handle_lanstreamrsp` to learn what the client sends to
+the session port (KCP conv/handshake) to make video flow.
+
 ## State machine (client peer side) — general (P2P/relay)
 
 1. **`p4p_mgmt_init`** — allocate the 4 crypto buffers (`p4p_crypto_init`), etc.

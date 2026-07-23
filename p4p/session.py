@@ -16,11 +16,59 @@ KCP implementation rather than reimplement the reliability layer.
 from __future__ import annotations
 
 import ipaddress
+import socket
 import struct
 from dataclasses import dataclass
 
+from .crypto import decode as _deobfuscate
 from .lansearch import LanSearchInfo
-from .packet import MsgType, build
+from .packet import MAGIC, MsgType, build, parse_plain
+
+# --- LAN stream request/response (VERIFIED against the live camera) ---------
+# send_lanstreamreq builds msgtype 0x1307, aux 0x21, 108-byte body; the camera
+# replies 0x1308 from a freshly-opened session port with its endpoint + a
+# session id, retransmitting until the client connects (KCP) to that port.
+LAN_STREAM_REQ_LEN = 108
+
+
+def build_lanstreamreq(uid: str, *, stream_index: int = 0) -> bytes:
+    """Build the obfuscated LAN stream-start request (msgtype 0x1307).
+
+    Verified: a body of const byte + UID (the other fields defaulting to 0)
+    is accepted by the camera, which responds 0x1308 with a session endpoint.
+    ``stream_index`` selects main/sub once its exact offset is pinned.
+    """
+    uid = uid.strip().upper()
+    body = bytearray(LAN_STREAM_REQ_LEN)
+    body[0] = 0x01
+    body[24:44] = uid.encode("ascii")
+    # candidate stream-index slot (body[100]); harmless if wrong-offset for now
+    struct.pack_into("<I", body, 100, stream_index)
+    return build(MsgType.LAN_STREAM_REQ, bytes(body), aux=0x21)
+
+
+@dataclass
+class LanStreamResponse:
+    """Parsed 0x1308 stream response: the camera's session endpoint."""
+
+    camera_ip: str
+    session_port: int
+    session_id: int          # body[24:28]; candidate KCP conv
+    uid: str
+    raw_body: bytes = b""
+
+
+def parse_lanstreamrsp(decoded: bytes) -> LanStreamResponse:
+    """Parse a deobfuscated 0x1308 response."""
+    pkt = parse_plain(decoded)
+    if pkt.msgtype != 0x1308:
+        raise ValueError(f"not a lanstream response (0x{pkt.msgtype:04x})")
+    b = pkt.body
+    camera_ip = socket.inet_ntoa(b[12:16])
+    session_port = int.from_bytes(b[16:18], "big")   # network order
+    session_id = int.from_bytes(b[24:28], "little")
+    uid = b[28:48].split(b"\x00", 1)[0].decode("ascii", "replace")
+    return LanStreamResponse(camera_ip, session_port, session_id, uid, b)
 
 
 def make_random_id(seed_bytes: bytes) -> int:
