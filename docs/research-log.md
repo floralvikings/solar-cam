@@ -10,6 +10,71 @@ Possible / Unknown**.
 
 ---
 
+## 2026-07-22 — First idle capture: platform identified as UBIA
+
+**Conditions:** MikroTik sniffer→file, filtered to `192.168.88.113`. Camera
+online, no deliberate user interaction ("idle"). 341 s, 10,168 packets,
+`captures/rbx-idle.pcap`.
+
+**Commands:**
+```
+scripts/summarize_pcap.py captures/rbx-idle.pcap --camera-ip 192.168.88.113
+scripts/udp_flow_report.py captures/rbx-idle.pcap --min-packets 8
+tshark -r ... -Y 'tls.handshake' | wc -l      # -> 0
+tshark -r ... -Y 'http.request'               # -> none
+```
+
+**Observed (facts):**
+- **Vendor cloud is `ubianet.com` → the UBIA platform** (matches UBox app).
+  Resolves a pool `m1..m8.ubianet.com` + `portal.us.ubianet.com`, hosted on
+  Tencent + Alibaba Cloud.
+- **Three channels**, all proprietary:
+  - **UDP 10240** → rendezvous pool; identical 16-byte header sent 6× to
+    several `m*` servers (registration/lookup).
+  - **UDP 20001** → 4 media servers; 2 pkts / 548 B every **~30 s**.
+  - **TCP 443** → same 4 media servers; persistent connections, 20–37 B
+    messages every ~6–10 s. **Zero TLS handshakes** → *not* HTTPS.
+- **TCP 80 traffic is not HTTP** (`http.request` = 0): bare TCP connects to
+  Akamai/CloudFront = reachability tests.
+- **Media upload burst at t≈190–200 s:** 242 pkts / 312 KB in ~10 s (+24 KB),
+  1320 B packets, camera→`170.101.97.156:20001`, **entropy 7.5 bits/byte**.
+  Steady state on that flow is otherwise only the 30 s keepalive.
+- **DNS flood = 86% of the capture** (8,768 pkts): 8 well-known domains
+  (~1,040 queries each). Bursty — silent t=30–150 s, then ~34 queries/s during
+  t=180–270 s, correlating with the upload.
+- Header fingerprints share the constant `d8d2254d498d` in **both directions
+  and both ports** → likely obfuscated device UID. Control entropy 4.87–6.34
+  (structured/obfuscated), media 7.5 (encrypted/compressed).
+
+**Interpretation:**
+- Platform = **UBIA cloud-brokered P2P**. Tag: **Confirmed.**
+- Camera maintains a **persistent outbound control connection** (answers
+  CLAUDE.md question 12: **yes**). Tag: **Confirmed.**
+- Camera **uploaded media to the cloud with no user interaction**. Tag:
+  **Strongly indicated** (likely a motion-triggered event clip).
+- Control plane is obfuscated but **low-entropy → plausibly reversible**;
+  media is encrypted/compressed and will be the hard part. Tag: **Possible.**
+- No STUN/TURN/QUIC/MQTT/RTP/mDNS/SSDP observed at all. Tag: **Confirmed**
+  (for this capture).
+
+**Capture artifact (important):** the MikroTik sniffer recorded **each frame
+twice** (ingress+egress); `editcap -d` reduces 10,168 → 7,197 packets. Real
+counts/bytes are ~half those reported. Qualitative findings unaffected.
+Procedure updated to dedupe / pin `filter-interface`.
+
+**Tooling fix:** `high_bandwidth_flows()` was flagging 4-packet DHCP and
+12-packet TCP handshakes as "likely video" because a sub-second duration
+inflates the byte-rate. Now the rate test requires ≥1 s and ≥20 packets; only
+the genuine 336 KB media flow is flagged. +2 regression tests (25 total).
+
+**Next experiment:**
+1. **Live-view capture** with the phone on a *different* AP/VLAN than the
+   camera (so any direct phone↔camera P2P crosses the tap), then
+   `compare_sessions.py idle=... live=...` to isolate session setup + video.
+2. Repeat idle capture to test whether the obfuscation mask is **static**.
+
+---
+
 ## 2026-07-21 — First live probe of the camera
 
 **Conditions:** Camera online & awake (UBox not necessarily open). Camera at

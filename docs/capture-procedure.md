@@ -100,6 +100,22 @@ storage is limited; idle/boot are only a few MB).
 Download `rbx-idle.pcap` (WinBox: Files → drag out; or `scp`/FTP from the
 router) into `captures/`.
 
+> ⚠️ **Duplicate frames.** Observed in practice: the sniffer recorded **every
+> frame twice** (once on ingress, once on egress), inflating packet/byte counts
+> ~2×. Either pin a single interface:
+>
+> ```rsc
+> /tool sniffer set filter-interface=bridge   # or the specific ether port
+> ```
+>
+> or dedupe after downloading:
+>
+> ```bash
+> editcap -d captures/rbx-idle.pcap captures/rbx-idle-dedup.pcap
+> ```
+>
+> Always sanity-check with `capinfos` before trusting absolute numbers.
+
 *Notes:* `file-limit` is in KB. `filter-ip-address` keeps the file small. To
 also catch DHCP/DNS at boot you can widen the filter or add
 `filter-ip-address=192.168.88.113/32,192.168.88.1/32`.

@@ -19,7 +19,7 @@ Observed network behavior per scenario. Populate from captures using
 | Scenario | Capture file | DNS names | Remote endpoints | L4/proto | Direct phone↔cam? | Via relay? | Notes |
 |----------|--------------|-----------|------------------|----------|-------------------|-----------|-------|
 | Boot | | | | | | | |
-| Idle | | | | | | | |
+| Idle | `rbx-idle.pcap` | `m1..m8.ubianet.com`, `portal.us.ubianet.com`, NTP, 8 connectivity-check domains | rendezvous pool (UDP 10240); 4 media servers `170.101.97.156`, `149.56.108.231`, `43.173.75.192`, `45.125.216.146` (TCP 443 + UDP 20001) | proprietary UDP + proprietary TCP/443 (**not TLS**) | n/a (phone idle) | n/a | 30s UDP keepalive; 6–10s TCP/443 heartbeat; **336 KB media burst at t≈190s**; DNS flood = 86% of capture |
 | App startup | | | | | | | |
 | Live view open | | | | | | | |
 | Live view close | | | | | | | |
@@ -44,10 +44,16 @@ Observed network behavior per scenario. Populate from captures using
 Interpretation goes in `cloud-dependencies.md`.
 
 ## Discovery protocols observed
-- mDNS: _TBD_
-- SSDP / UPnP: _TBD_
-- WS-Discovery (ONVIF): _TBD_
-- ARP / DHCP / NTP: _TBD_
+Idle capture (`rbx-idle.pcap`) — the camera emits **no** local discovery:
+- mDNS: **none** — **Confirmed**
+- SSDP / UPnP: **none from the camera** — **Confirmed**
+- WS-Discovery (ONVIF): **none** — **Confirmed**
+- STUN / TURN / QUIC / DTLS / MQTT / RTP / RTCP: **none observed** — **Confirmed**
+- ARP / DHCP: yes (DHCP Offer/ACK from `192.168.88.1` captured at start)
+- NTP: yes (`pool.ntp.org`, `hk.ntp.org.cn`, `de.ntp.org.cn`, `uk.ntp.pool.org`)
+
+⇒ The camera is **outbound-only to the UBIA cloud**. Nothing on the LAN can
+discover or address it. See `protocol-notes.md` and `cloud-dependencies.md`.
 
 Run `scripts/probe_camera.py <ip>` (awake) to actively check the discovery
 protocols and any transient local ports.
