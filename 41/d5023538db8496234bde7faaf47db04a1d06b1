@@ -1,0 +1,49 @@
+custom_components/rbx_s73/timelapse.py
+  s_a6061006c7ef24::t_dbcaaeeecd5716 1-31,34-37,42-63,76-100,102-106,111-201
+  s_a6061006c7ef24::t_cabbc01a62895f 32-33,38-41
+  s_a6061006c7ef24::t_cdb2cb449b34bb 64-75
+  s_a6061006c7ef24::t_19c7719e977a6f 101,107-110
+custom_components/rbx_s73/switch.py
+  s_a6061006c7ef24::t_131ae83dde3969 1-77
+custom_components/rbx_s73/__init__.py
+  s_a6061006c7ef24::t_0d3913fecdb84d 5,16,18,23-25,27,31-37,44-45
+README.md
+  s_a6061006c7ef24::t_7b5094086c22bf 32-49
+custom_components/rbx_s73/manifest.json
+  s_a6061006c7ef24::t_f1fb522b29d84a 11
+custom_components/rbx_s73/const.py
+  s_a6061006c7ef24::t_b23ff5e8d2e343 15-16,22-27
+  s_a6061006c7ef24::t_d44588e6594b96 13-14,17-21,28-31
+custom_components/rbx_s73/config_flow.py
+  s_a6061006c7ef24::t_033f7e7348148e 121-130
+  s_a6061006c7ef24::t_84a2a8806df6ee 10-16,23-29,32-36,39,41
+  s_a6061006c7ef24::t_37e14f37a940af 17-21,30-31,37-38,40
+  s_a6061006c7ef24::t_baf4f6f0460a82 72-76
+  s_a6061006c7ef24::t_063cf70a672bae 106-120,131-147
+custom_components/rbx_s73/coordinator.py
+  s_a6061006c7ef24::t_ff5439cafb4a2c 52
+custom_components/rbx_s73/translations/en.json
+  s_a6061006c7ef24::t_b52b567f128e6c 25,27-28,34-42
+  s_a6061006c7ef24::t_6decad2ad52c99 20-24,26,29-33,43-56
+custom_components/rbx_s73/strings.json
+  s_a6061006c7ef24::t_7b75d8d94deb53 20-24,26,29-33,43-56
+  s_a6061006c7ef24::t_a12ea692335ac6 25,27-28,34-42
+custom_components/rbx_s73/services.yaml
+  s_a6061006c7ef24::t_5b366ce73ab564 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "41d5023538db8496234bde7faaf47db04a1d06b1",
+  "prompts": {},
+  "sessions": {
+    "s_a6061006c7ef24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0eb50487-34fe-481b-9ae8-93b6ba2bf0f7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
