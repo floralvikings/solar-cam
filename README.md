@@ -71,12 +71,14 @@ python scripts/probe_camera.py 192.168.50.42
 
 ## Capturing traffic
 
-Capture on a mirror port / router / bridge, labeling each scenario clearly
-(boot, idle, app-startup, live-view, pan, tilt, audio, motion, sd-playback,
-wan-blocked). **Wake the camera first** — it may sleep its radio when idle.
+Full step-by-step (MikroTik / Dell SPAN / macOS, and where to tap) is in
+[`docs/capture-procedure.md`](docs/capture-procedure.md) — **no Linux VM
+needed**. Label each scenario clearly (boot, idle, app-startup, live-view, pan,
+tilt, audio, motion, sd-playback, wan-blocked). **Wake the camera first** — it
+may sleep its radio when idle.
 
 ```bash
-sudo tcpdump -i <iface> host 192.168.50.42 -w captures/rbx-s73-live-view.pcap
+sudo tcpdump -i <iface> host 192.168.88.113 -w captures/rbx-s73-idle.pcap
 ```
 
 Captures live in `captures/` and are **git-ignored** — they can contain device
