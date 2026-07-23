@@ -1,0 +1,28 @@
+scripts/probe_camera.py
+  s_76f8a99bc79680::t_aebfff3698db36 378-393
+  s_76f8a99bc79680::t_7e74f087f7c640 403-420
+  s_76f8a99bc79680::t_c315e5e5e0c06d 87-89,93-102,108-111,113-130,132-133,136-140,148,150-158
+  s_76f8a99bc79680::t_44de2bbf61f30a 344-353
+  s_76f8a99bc79680::t_a6500d9b185719 45-86,90-92,103-107,112,131,141-145,149,159
+  s_76f8a99bc79680::t_fceb6a73afa4c2 134-135,146-147
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_9c54161fb12437 87-137
+tests/test_probe_camera.py
+  s_76f8a99bc79680::t_9412fe4818cd4f 1-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "533a368eb10ddab78985e8591e14798facef3f78",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
