@@ -6,10 +6,16 @@
 captures/*
 !captures/.gitkeep
 
-# Mobile app artifacts
+# Mobile app artifacts (APKs and everything decompiled out of them --
+# these can contain keys, endpoints, and account identifiers)
 *.apk
 *.xapk
 *.aab
+*.dex
+*.so
+apk/
+jadx-output/
+apktool-output/
 
 # Firmware images and extractions
 firmware/*
