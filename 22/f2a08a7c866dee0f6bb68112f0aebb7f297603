@@ -1,0 +1,21 @@
+docs/capture-procedure.md
+  s_76f8a99bc79680::t_5c526bc1f5b868 1-195
+README.md
+  s_76f8a99bc79680::t_7c4dcc22d48dd4 74-78,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "22f2a08a7c866dee0f6bb68112f0aebb7f297603",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
