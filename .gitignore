@@ -66,3 +66,9 @@ scratch/
 tmp/
 *.log
 !docs/**/*.log
+
+# Repackaging/Frida toolchain artifacts (may contain captured secrets)
+tools/*.keystore
+tools/*.idsig
+tools/hooklog.txt
+tools/*.output
