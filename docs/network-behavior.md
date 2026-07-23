@@ -21,7 +21,7 @@ Observed network behavior per scenario. Populate from captures using
 | Boot | | | | | | | |
 | Idle | `rbx-idle.pcap` | `m1..m8.ubianet.com`, `portal.us.ubianet.com`, NTP, 8 connectivity-check domains | rendezvous pool (UDP 10240); 4 media servers `170.101.97.156`, `149.56.108.231`, `43.173.75.192`, `45.125.216.146` (TCP 443 + UDP 20001) | proprietary UDP + proprietary TCP/443 (**not TLS**) | n/a (phone idle) | n/a | 30s UDP keepalive; 6–10s TCP/443 heartbeat; **336 KB media burst at t≈190s**; DNS flood = 86% of capture |
 | App startup | | | | | | | |
-| Live view open | | | | | | | |
+| Live view open | `rbx-live.pcap` | (phone) `m*.ubianet.com`, media servers | phone→cloud lookup/session only; **phone↔camera direct = 0 at router** | P4P over UDP, direct P2P bridged in AP | **Yes (direct)** | No | Video L2-bridged in AP, invisible to router; phone LAN-searches on 32762 first |
 | Live view close | | | | | | | |
 | Pan | | | | | | | |
 | Tilt | | | | | | | |

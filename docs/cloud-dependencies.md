@@ -51,8 +51,9 @@ Four servers, contacted on **both** transports simultaneously and held open:
 | Control traffic on 443 is **not TLS** | 0 TLS handshakes; decoded as plaintext `uid=`/`hostalive=`/`iotalive=` heartbeats | **Confirmed** |
 | Cloud performs P2P signaling (hands out peer/relay) | Decoded `0x1101/0x1102` session-connect + `0x1105/0x1106` peer-address exchange | **Confirmed** |
 | Cloud is a **rendezvous/hole-punch broker** | `0x1105` carries phone LAN `192.168.88.111:34755`; `0x1106` carries camera LAN `192.168.88.113:33900` | **Strongly indicated** |
-| Media relayed via cloud vs direct P2P | Idle-capture event clip (`0x140a`) went to a cloud media server; live-view phone↔camera path still needs a live capture | **Possible** (both used) |
-| Media travels directly phone↔camera on LAN | LAN addresses are exchanged → direct path intended; confirm with live-view capture | **Strongly indicated** |
+| Media relayed via cloud vs direct P2P | Live view: **no** media flow through the router at all; event-clip upload (`0x140a`) is a separate cloud path | **Confirmed** (live view is direct, not relayed) |
+| Media travels directly phone↔camera on LAN | Live capture: 0 phone↔camera pkts at the router + 0 video volume, yet live view worked → AV is L2-bridged in the AP | **Confirmed** |
+| LAN-only live view works after cloud init | Phone located camera via LAN-search (32762), not cloud; cloud responses omit the camera LAN addr | **Confirmed** (on shared LAN) |
 | LAN-only live view works after cloud init | Needs Test B | Unknown |
 | LAN-only works from cold (no cloud at all) | Needs Test D | Unknown |
 

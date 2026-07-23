@@ -89,10 +89,50 @@ No camera interaction.
   search → session connect → receive AV directly from the camera, no cloud.
 
 **Next experiment:**
-1. **Live-view capture** (phone + camera same LAN) → confirm the AV path is
-   direct `192.168.88.111 ↔ .113` and capture a full session handshake.
-2. Map `0x1101`/`0x1102` session fields; then replay a minimal LAN session from
-   a script and try `send_ioctrl` PTZ.
+1. ~~Live-view capture~~ done — see next entry.
+2. Map session fields; replay a minimal LAN session + `send_ioctrl` PTZ.
+
+---
+
+## 2026-07-23 — Live view is DIRECT phone↔camera P2P — **Confirmed**
+
+**Conditions:** MikroTik bridge sniffer, filtered to camera `.113` + phone
+`.111`, during ~40 s of live view + pan. `captures/rbx-live.pcap` (2140 pkts,
+374 KiB, **8.6 KB/s** — no video-scale flow anywhere).
+
+**Observed (facts):**
+- **Zero** packets between phone `.111` and camera `.113` in the router capture,
+  and **no high-bandwidth flow at all** (largest UDP conv ~3 KB). Live view and
+  pan worked on the phone throughout.
+- The phone broadcast a **LAN-search to `192.168.88.255:32762`** (~31 pkts over
+  3.2 s) whose payload is **byte-identical** to our reconstructed request.
+- Phone↔cloud signaling is small and client-side: `0x1051/0x1052` (lookup, to
+  `m*.ubianet.com:10240`), `0x1201/0x1202` (session, to `…:20001`). The cloud
+  responses to the phone do **not** contain the camera's LAN address.
+
+**Interpretation:**
+- **Live AV goes directly phone↔camera, L2-bridged in the Wi-Fi AP** (hence
+  invisible to the router and zero-volume there). Tag: **Confirmed.**
+- The client locates the camera via **LAN search**, not the cloud, when on the
+  same LAN. Cloud is used only for a lightweight parallel rendezvous/keepalive.
+  Tag: **Confirmed.**
+- Answers CLAUDE.md Q4/Q7/Q11: phone talks **directly** to camera; video is
+  **direct** not relayed (on-LAN); **LAN-only operation works**.
+
+**Strategic consequence — the local path is fully mapped:**
+`LAN-search(32762)` → camera replies with `LanSearchInfo` (UID/creds/session
+params, already decoded) → client opens a **direct session** → AV streams P2P.
+A bridge daemon replicates the *client peer*. Only the post-LAN-search session
+handshake remains to be reversed; it is bridged in the AP so not visible to the
+router — derive it from the SDK (`p4p_client_start`→`startvideo`) and iterate
+our own client against the camera (our Mac↔camera traffic *is* visible to us),
+using a monitor-mode/AP capture only if we get stuck.
+
+**Next experiment:**
+1. Trace `p4p_client_start` / `p4p_client_startvideo` in `libUBICAPIs.so` to
+   derive the direct-session packet sequence + ports.
+2. Prototype a minimal LAN client (LAN-search → session connect), capturing our
+   own Mac↔camera traffic to verify each step.
 
 ---
 
