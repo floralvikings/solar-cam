@@ -36,34 +36,38 @@ def build_lanstreamreq(
     *,
     conv: int = 0,
     password: bytes = b"",
-    password_offset: int = 76,
-    stream_index: int = 0,
+    account: bytes = b"admin",
+    client_ip: str = "0.0.0.0",
+    client_port: int = 0,
+    descriptor_tail: bytes = bytes.fromhex("0900000100000000bc97040000000000"),
 ) -> bytes:
     """Build the obfuscated LAN stream-start request (msgtype 0x1307).
 
-    The camera runs ``p4p_device_auth`` on this request and **frees the session
-    (no video) unless the 16-byte view password authenticates** (verified by
-    disassembly: on auth != 0 the device calls ``p4p_device_free_session``).
+    Body layout recovered from a Frida dump of the real app's request:
 
-    Fields (from the SDK's ``send_lanstreamreq``):
-      * body[0]      = 0x01
-      * body[24:44]  = device UID (checked against the device's own UID)
-      * body[72:76]  = ``conv`` (client randomID; also the KCP conv)
-      * body[76:92]  = 16-byte **view password** (``sess+0xf8``) -- the auth gate
+      * body[0]       = 0x01
+      * body[12:16]   = client LAN IP (where the camera streams video)
+      * body[16:18]   = client port (network order)
+      * body[24:44]   = device UID
+      * body[44:60]   = **16-byte view password** (the LanSearchInfo credential)
+      * body[72:76]   = ``conv`` (client randomID; also the KCP conv)
+      * body[76:92]   = **account** (16 bytes, null-padded; "admin")
+      * body[92:108]  = stream descriptor (flags + a session token)
 
-    The password is NOT the LanSearchInfo credential and is not a common
-    default (both tried, both rejected); it is the value set when the camera
-    was bound in UBox. ``password_offset`` is exposed because the exact slot
-    is our best inference (body[76]) pending a ground-truth dump.
+    The camera runs ``p4p_device_auth`` on this and frees the session (no video)
+    unless the account+password authenticate.
     """
     uid = uid.strip().upper()
     body = bytearray(LAN_STREAM_REQ_LEN)
     body[0] = 0x01
+    import socket as _socket
+    body[12:16] = _socket.inet_aton(client_ip)
+    struct.pack_into(">H", body, 16, client_port & 0xFFFF)
     body[24:44] = uid.encode("ascii")
+    body[44:44 + len(password[:16])] = password[:16]
     struct.pack_into("<I", body, 72, conv & 0xFFFFFFFF)
-    if password:
-        body[password_offset:password_offset + len(password[:16])] = password[:16]
-    struct.pack_into("<I", body, 100, stream_index)
+    body[76:76 + len(account[:16])] = account[:16]
+    body[92:92 + len(descriptor_tail[:16])] = descriptor_tail[:16]
     return build(MsgType.LAN_STREAM_REQ, bytes(body), aux=0x21)
 
 

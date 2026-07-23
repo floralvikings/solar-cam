@@ -194,7 +194,32 @@ descriptor at body[44:108] (`sess+0x108`) that we currently zero — was never
 seen. That descriptor (stream index / quality / channel setup) is almost
 certainly what makes the camera start streaming.
 
-### ⛔ The gate is AUTH — `p4p_device_auth` (confirmed by disassembly + live tests)
+### 🎥 SOLVED — local video streaming works (2026-07-23, Frida ground truth)
+
+A Frida hook (`tools/hook.js`) on `p4p_client_send_lanstreamreq` in the real app
+dumped the actual request. The auth fields I'd had **swapped**:
+
+```
+body[0]      = 0x01
+body[12:16]  = client LAN IP        (where the camera streams video)
+body[16:18]  = client port (network order)
+body[24:44]  = device UID
+body[44:60]  = 16-byte VIEW PASSWORD  (== the LanSearchInfo credential!)
+body[72:76]  = conv (client randomID / KCP conv)
+body[76:92]  = ACCOUNT "admin" (16 bytes, null-padded)
+body[92:108] = stream descriptor (flags + session token)
+```
+
+With password at **body[44]** and account `admin` at **body[76]** (I had put the
+password at 76), the camera authenticates and **pushes H.264 over KCP directly
+to our client** — verified live: 615 `0x140a` frames received, cloud-free.
+`p4p.session.build_lanstreamreq` builds this exactly. Full loop:
+`discover → build_lanstreamreq(conv, password, account, client_ip/port) →
+0x1308 → build_alive(conv) + build_kcp_ack loop → 0x140a KCP PUSH → H.264`.
+
+Note: only one session per camera at a time (the app's live view must be closed).
+
+### ⛔ (historical) The gate is AUTH — `p4p_device_auth`
 
 The lanstreamreq handler calls `p4p_device_auth`; on failure (`w0 != 0`) the
 device calls `p4p_device_free_session` → **no video**. `p4p_device_auth`:
