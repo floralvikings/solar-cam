@@ -159,12 +159,38 @@ capstone disassembly of the `send_*` builders). Full detail in
 - **KCP being stock is a major shortcut** — reuse an existing library rather than
   reverse the reliability layer.
 
-**Next experiment (Phase 2 build):**
-1. Prototype a Python `p4p` client: parse `LanSearchInfo` → preconnect → KCP →
-   `lanstreamreq`, all control via `ubia_crypto`. Verify each step against our
-   own Mac↔camera tcpdump (visible since it's our traffic). Pin the candidate
-   msgtypes + field offsets.
-2. Then feed the H.264 stream to go2rtc/MediaMTX → RTSP → Home Assistant.
+**Next experiment (Phase 2 build):** started — see next entry.
+
+---
+
+## 2026-07-23 — Phase 2: p4p client foundation (discovery works)
+
+**Conditions:** built the runtime `p4p/` package; verified against the live
+camera from the Mac.
+
+**Done (facts):**
+- New standalone `p4p/` package (no dependency on `scripts/`): `crypto`
+  (canonical, with a parity test vs `pcaptools.ubia_crypto`), `packet` (16-byte
+  header framing + `MsgType` map), `lansearch` (request build + `LanSearchInfo`
+  parse + `discover()` with radio-warmup retry), `session` (skeleton).
+- Verified P4P header layout from real bytes: standard msgs =
+  `magic(4)|paylen(u16,=total-16)|flags(2)|msgtype(u16)|aux(2)|resv(4)`;
+  LAN-search request = compact 8-byte plaintext.
+- `scripts/p4p_discover.py --uid …` **found the camera live** and parsed its
+  reply: uid, `account=admin`, credential (redacted), and model token `RBX`.
+- 75 tests pass (all synthetic; no real secrets committed).
+
+**Interpretation:** the discovery + framing + obfuscation layers are proven
+against the real device. The remaining unknowns are all in the session layer
+(preconnect body, KCP conv, lanstreamreq) — to be pinned by driving our own
+client and capturing Mac↔camera traffic.
+
+**Next experiment (Phase 2b):**
+1. Implement + send the preconnect/PUNCH2LAN (candidate 0x110A) to the camera;
+   capture our own Mac↔camera traffic to confirm the reply and pin the body.
+2. Wrap a KCP library (conv = randomID); send `lanstreamreq`; receive H.264.
+3. Phase 3: bridge daemon → go2rtc/MediaMTX → RTSP → Home Assistant; then
+   Phase 4 VLAN lockdown (camera → bridge/HA only).
 
 ---
 
