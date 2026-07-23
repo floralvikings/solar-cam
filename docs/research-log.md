@@ -45,13 +45,15 @@ Possible / Unknown**.
 - One transform covers LAN **and** cloud (shared header family) → we should be
   able to decode the earlier UDP 10240/20001 + TCP 443 captures too.
 
-**Wake question (open):** the very first single-shot probe got no reply; a reply
-came only after repeats *with live view open*. Leading hypothesis: the LAN
-responder runs only while the camera is awake (`CLI_SESSION_WAKEUP = 1`). User
-is leaving the camera cold to re-test without opening the app.
+**Wake question — RESOLVED (same day):** cold re-probe (camera untouched, app
+closed) → 10-round test showed first ~2 rounds silent, then **8/8 replies**;
+cold reply decodes identically. So it is a **Wi-Fi radio warmup**, not a cloud
+wake: the camera answers ICMP while power-saving but its P4P LAN responder needs
+the radio fully up (~5–7 s of probing). **Local discovery does not need the
+cloud.** Tag: **Confirmed.** Bridge should retry LAN-search ~5–10 s on connect.
 
 **Next experiment:**
-1. Cold re-probe (camera untouched, app closed) → does it still answer?
+1. ~~Cold re-probe~~ done — warmup, not cloud-wake.
 2. `ubia_crypto.decode` the idle-capture UDP 10240/20001 + TCP 443 payloads.
 3. Map the LanSearchInfo response fields; then try a full LAN session
    (`send_ioctrl` with the PTZ opcodes).

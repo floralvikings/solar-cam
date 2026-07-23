@@ -156,12 +156,19 @@ The same transform is used on the **cloud** channels too (shared header family
 `…2d62bcd8d2…`), so `ubia_crypto.decode` should also open the UDP 10240/20001
 and TCP 443 payloads for analysis.
 
-### Open question: does the camera need waking first?
-The first probe attempt got **no reply**; a reply arrived on a later attempt
-(~7 s into a repeated probe loop). Cause not yet isolated — either the camera
-must be woken (cf. `CLI_SESSION_WAKEUP = 1`) or the single-shot attempt simply
-missed. **Re-test on a camera left untouched for a while, without opening the
-app**, to settle it.
+### Resolved: no cloud wake needed — just a radio warmup — **Confirmed**
+Tested cold (camera untouched, app closed). Pattern across a 10-round probe:
+first ~2 rounds (~5–7 s) silent, then **8/8 replies**. The camera answers
+ICMP even while power-saving, but its P4P LAN responder only replies once the
+Wi-Fi radio is fully up; a few seconds of repeated probing spins it up, after
+which it answers reliably. The cold reply decodes identically (magic
+`07181000`, msgtype `0x1302`, correct UID).
+
+⇒ **Local access does not depend on the cloud.** `CLI_SESSION_WAKEUP` is about
+P2P session state, not a cloud precondition for LAN discovery. Practical
+implication for the bridge: on connect, **retry LAN-search for ~5–10 s** to
+allow radio warmup before giving up. High, variable ping RTT (250–730 ms) is
+consistent with 802.11 power-save (DTIM buffering).
 
 ## Connectivity-check loop (noise, not protocol) — **Confirmed**
 
