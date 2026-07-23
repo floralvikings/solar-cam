@@ -185,7 +185,39 @@ against the real device. The remaining unknowns are all in the session layer
 (preconnect body, KCP conv, lanstreamreq) — to be pinned by driving our own
 client and capturing Mac↔camera traffic.
 
-**Next experiment (Phase 2b):** in progress — see next entry.
+**Next experiment (Phase 2b):** in progress — see entries below.
+
+---
+
+## 2026-07-23 — Phase 2b: session opens; KCP connect is the blocker
+
+**Conditions:** driving our `p4p` client against the live camera from the Mac
+(empirical harnesses `scratchpad/probe_session*.py`), plus SDK disassembly.
+
+**Done (facts):**
+- **Camera accepts our `lanstreamreq` (0x1307) → replies 0x1308** with a fresh
+  session UDP port, its endpoint, and session_id `0xf82b`; retransmits 0x1308
+  until the client completes the connect. (Committed: `build_lanstreamreq`,
+  `parse_lanstreamrsp`.)
+- KCP recipe extracted: conv=`avchn[0xc]`, `wndsize(128,256)`,
+  `nodelay(interval=10ms)`; video = KCP inside obfuscated P4P `0x140a` frames.
+
+**Tried for the connect (all fail to start video):**
+- `0x1405` alive to session port with session_id echoed → camera keeps
+  retransmitting 0x1308.
+- Re-send `0x1307` to the session port → camera replies 0x1308 again.
+- `0x140a`-wrapped KCP (WASK / empty PUSH, conv=session_id) and raw KCP to the
+  session port → **camera goes silent** (no video, no 0x1308).
+
+**Interpretation:** the session is open and the camera is stream-ready, but the
+exact **connect/ack + KCP conv/framing** is not yet right. Blind probing has hit
+diminishing returns. Tag: **blocked** on ground truth.
+
+**Decision needed (fastest path):** obtain a ground-truth capture of the *real
+app's* session-port handshake — via Wi-Fi monitor-mode capture (needs the WLAN
+PSK to decrypt) or Frida on the phone (dump the SDK's exact send bytes) — vs.
+continue deep static RE of `handle_lanstreamrsp` + KCP framing. See
+`docs/session-flow.md` for the full recipe.
 
 ---
 
