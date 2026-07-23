@@ -84,9 +84,57 @@ The SDK defines `CLI_SESSION_LAN = 5` alongside `CLI_SESSION_P2P = 4`, exposes
 LAN-discovery broadcast**. That is why SSDP/ONVIF/mDNS probes found nothing:
 we were speaking the wrong protocol, not talking to a silent device.
 
-**Next test:** capture the UBox app performing a LAN search (phone *and* camera
-on the same LAN) to recover the discovery port and packet bytes, then replay it
-from `probe_camera.py`.
+## 🔓 LAN discovery WORKS — **Confirmed** (2026-07-23)
+
+The camera answers a proprietary LAN-discovery request on **UDP 32762**,
+replying **directly to an arbitrary LAN host** (our Mac) with no cloud and no
+phone involved. This is the first proven cloud-free channel to the device.
+
+### Request (36 bytes, **plaintext**)
+Recovered by capturing the UBox app's startup broadcast to
+`<subnet>.255:32762`, then reproduced byte-for-byte by
+`scripts/probe_camera.py --uid <UID>`:
+
+```
+offset  0   07 18 10 00        fixed prefix
+offset  4   24 00              uint16 LE total length (0x0024 = 36)
+offset  6   01 13              message type
+offset  8   <20 ASCII UID> 00  device UID, null-terminated
+offset 29   fe 3d 03 00 00 00 00
+```
+
+⚠️ The 20-char UID is a **device secret** — it is the camera's address on the
+P2P network. Never commit it; pass it via `--uid` at runtime.
+
+The app broadcasts this ~33× at ~200 ms intervals (retry behaviour).
+
+### Response (408 bytes, obfuscated)
+```
+25 x 16-byte blocks  +  8-byte ASCII trailer ("2udb5ekC"-style token)
+11 unique blocks; one block repeats 15x (empty/padding records)
+```
+Analysis so far:
+- Identical plaintext → identical ciphertext at 16-byte alignment ⇒ a
+  **static, position-independent block transform**.
+- **Not** a strong block cipher: different message types share long common
+  prefixes and differ in only a few bytes
+  (`04a48c0d62bcd8d2…` LAN vs `04ac9d2d62bcd8d2…` cloud/10240), where AES
+  would avalanche. Tag: **Strongly indicated.**
+- The UID is **not** recoverable by single-byte XOR nor by any repeating XOR
+  key of period 4/8/16. So it is more than trivial XOR (substitution table or
+  similar), or the UID simply is not echoed. Tag: **Confirmed** (negative).
+- The response shares the header family of the cloud traffic
+  (`…2d62bcd8d2…`), i.e. one transform is used on both LAN and cloud paths.
+
+**Next:** locate the transform in `libUBICAPIs.so` rather than guess — see
+`apk-analysis.md`.
+
+### Open question: does the camera need waking first?
+The first probe attempt got **no reply**; a reply arrived on a later attempt
+(~7 s into a repeated probe loop). Cause not yet isolated — either the camera
+must be woken (cf. `CLI_SESSION_WAKEUP = 1`) or the single-shot attempt simply
+missed. **Re-test on a camera left untouched for a while, without opening the
+app**, to settle it.
 
 ## Connectivity-check loop (noise, not protocol) — **Confirmed**
 

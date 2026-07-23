@@ -42,6 +42,121 @@ RTSP_PORTS = {554, 8554}
 WS_DISCOVERY_ADDR = ("239.255.255.250", 3702)
 SSDP_ADDR = ("239.255.255.250", 1900)
 
+# --- UBIA/TUTK proprietary LAN discovery -----------------------------------
+# Recovered by capturing the UBox app's startup broadcast (see
+# docs/protocol-notes.md). The camera firmware implements the device side
+# (p4p_device_handle_lansearchreq), so it answers this where it ignores
+# SSDP/ONVIF/mDNS.
+LAN_SEARCH_PORT = 32762
+_LAN_SEARCH_PREFIX = bytes([0x07, 0x18, 0x10, 0x00])
+_LAN_SEARCH_TYPE = bytes([0x01, 0x13])
+_LAN_SEARCH_TAIL = bytes([0xFE, 0x3D, 0x03, 0x00, 0x00, 0x00, 0x00])
+UID_LEN = 20
+
+
+def build_lansearch_request(uid: str) -> bytes:
+    """Build the 36-byte UBIA/TUTK LAN-search request for a device UID.
+
+    Layout (little-endian length at offset 4):
+        07 18 10 00 | <len:u16> | 01 13 | <uid:20 ascii> 00 | fe 3d 03 00*4
+    """
+    uid = uid.strip().upper()
+    if len(uid) != UID_LEN or not uid.isalnum():
+        raise ValueError(
+            f"UID must be {UID_LEN} alphanumeric characters, got {uid!r}"
+        )
+    body = uid.encode("ascii") + b"\x00"
+    total = len(_LAN_SEARCH_PREFIX) + 2 + len(_LAN_SEARCH_TYPE) + len(body) + len(
+        _LAN_SEARCH_TAIL
+    )
+    return (
+        _LAN_SEARCH_PREFIX
+        + total.to_bytes(2, "little")
+        + _LAN_SEARCH_TYPE
+        + body
+        + _LAN_SEARCH_TAIL
+    )
+
+
+def lan_search(
+    uid: str,
+    targets: list[str],
+    timeout: float,
+    port: int = LAN_SEARCH_PORT,
+    max_replies: int = 10,
+    bind_port: Optional[int] = LAN_SEARCH_PORT,
+    repeat: int = 5,
+    interval: float = 0.2,
+) -> list[dict[str, Any]]:
+    """Send the LAN-search request and collect replies.
+
+    ``targets`` may mix broadcast and unicast addresses; one socket is reused
+    so replies to any of them land here.
+
+    We bind the local socket to ``bind_port`` (the same well-known port we
+    send to) because the device may reply either to our source port *or* to
+    the fixed discovery port -- binding it covers both. Falls back to an
+    ephemeral port if the bind fails (e.g. port already in use).
+
+    The real app broadcasts repeatedly rather than once, so ``repeat`` sends
+    are made ``interval`` seconds apart before listening out the timeout.
+    """
+    payload = build_lansearch_request(uid)
+    replies: list[dict[str, Any]] = []
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except (AttributeError, OSError):
+            pass
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        if bind_port is not None:
+            try:
+                s.bind(("", bind_port))
+            except OSError:
+                pass  # fall back to an ephemeral source port
+        s.settimeout(interval)
+
+        deadline_sends = 0
+        while deadline_sends < repeat:
+            for target in targets:
+                try:
+                    s.sendto(payload, (target, port))
+                except OSError as e:
+                    msg = f"{target}: {e}"
+                    if not any(r.get("error") == msg for r in replies):
+                        replies.append({"error": msg})
+            deadline_sends += 1
+            # Drain any replies that arrive between sends.
+            try:
+                while len(replies) < max_replies:
+                    data, src = s.recvfrom(4096)
+                    if data == payload:
+                        continue  # our own broadcast echoed back
+                    replies.append(_decode_reply(data, src))
+            except (socket.timeout, OSError):
+                pass
+
+        s.settimeout(timeout)
+        while len(replies) < max_replies:
+            try:
+                data, src = s.recvfrom(4096)
+            except (socket.timeout, OSError):
+                break
+            if data == payload:
+                continue  # our own broadcast echoed back
+            replies.append(_decode_reply(data, src))
+    return replies
+
+
+def _decode_reply(data: bytes, src: tuple) -> dict[str, Any]:
+    return {
+        "from": f"{src[0]}:{src[1]}",
+        "bytes": len(data),
+        "hex": data.hex(),
+        "ascii": "".join(chr(b) if 32 <= b < 127 else "." for b in data),
+    }
+
 _WS_DISCOVERY_PROBE = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope" '
@@ -226,6 +341,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Skip WS-Discovery/SSDP multicast probes.",
     )
+    p.add_argument(
+        "--uid",
+        help="Device UID (20 chars). Enables the UBIA/TUTK LAN-search probe. "
+        "Treat as a secret: do not commit it.",
+    )
+    p.add_argument(
+        "--broadcast",
+        default="255.255.255.255",
+        help="Broadcast address for LAN search (default 255.255.255.255).",
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
     return p
 
@@ -250,6 +375,22 @@ def _print_text(r: dict[str, Any]) -> None:
         for rep in cam:
             print(f"      <- camera {rep.get('from')} ({rep.get('bytes')} bytes)")
 
+    ls = r.get("lan_search")
+    if ls is not None:
+        cam = [x for x in ls if x.get("is_camera")]
+        other = [x for x in ls if not x.get("is_camera") and "from" in x]
+        note = "*** CAMERA RESPONDED ***" if cam else "no reply from camera"
+        print(f"  lan-search   : {note} "
+              f"({len(cam)} from camera, {len(other)} from other hosts)")
+        for rep in ls:
+            if "error" in rep:
+                print(f"      error: {rep['error']}")
+                continue
+            tag = "CAMERA" if rep.get("is_camera") else "other "
+            print(f"      [{tag}] {rep['from']}  {rep['bytes']} bytes")
+            print(f"        hex  : {rep['hex']}")
+            print(f"        ascii: {rep['ascii']}")
+
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
@@ -259,6 +400,24 @@ def main(argv: list[str] | None = None) -> int:
         else DEFAULT_TCP_PORTS
     )
     result = probe(args.camera_ip, ports, args.timeout, args.discovery)
+
+    if args.uid:
+        try:
+            replies = lan_search(
+                args.uid,
+                [args.broadcast, args.camera_ip],
+                max(args.timeout, 3.0),
+            )
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        for rep in replies:
+            src = rep.get("from", "")
+            rep["is_camera"] = src.rsplit(":", 1)[0] == args.camera_ip
+        result["lan_search"] = replies
+        if any(r.get("is_camera") for r in replies):
+            result["awake"] = True
+
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
