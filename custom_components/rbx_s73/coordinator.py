@@ -49,6 +49,7 @@ class RbxS73Device:
         self.client_ip: str = entry.data[CONF_CLIENT_IP]
         self.entry_id: str = entry.entry_id
         self.stream = CameraStream(self._mjpeg_cmd)
+        self.timelapse = None  # set by __init__.async_setup_entry
 
     def _mjpeg_cmd(self) -> str:
         py = sys.executable or "python3"

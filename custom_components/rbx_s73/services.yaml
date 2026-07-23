@@ -1,0 +1,14 @@
+compile_timelapse:
+  name: Compile time-lapse
+  description: Compile a day's captured frames into an mp4 now.
+  target:
+    entity:
+      integration: rbx_s73
+      domain: switch
+  fields:
+    date:
+      name: Date
+      description: Day to compile as YYYYMMDD (defaults to today).
+      example: "20260723"
+      selector:
+        text:

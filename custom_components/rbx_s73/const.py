@@ -10,3 +10,22 @@ CONF_CLIENT_IP = "client_ip"  # this HA host's LAN IP (video destination)
 
 # The camera only serves one AV session at a time; the integration owns it.
 LAN_SEARCH_PORT = 32762
+
+# --- Time-lapse options (config entry options) ---
+CONF_TL_RATE = "timelapse_rate"              # how many frames to capture per unit
+CONF_TL_RATE_UNIT = "timelapse_rate_unit"    # "minute" | "hour" | "day"
+CONF_TL_FPS = "timelapse_fps"                # output video frame rate
+CONF_TL_DIR = "timelapse_dir"                # base output directory
+CONF_TL_KEEP_FRAMES = "timelapse_keep_frames"  # keep JPEGs after compiling
+CONF_TL_COMPILE_HOUR = "timelapse_compile_hour"  # daily auto-compile hour; <0 off
+
+# capture rate -> interval: seconds_in(unit) / rate
+TL_UNIT_SECONDS = {"minute": 60, "hour": 3600, "day": 86400}
+TL_MIN_INTERVAL_SECONDS = 5  # floor (a capture wakes the camera ~10s)
+
+DEFAULT_TL_RATE = 4            # 4 frames/hour = one every 15 min
+DEFAULT_TL_RATE_UNIT = "hour"
+DEFAULT_TL_FPS = 24
+DEFAULT_TL_DIR = "/media/rbx_s73"
+DEFAULT_TL_KEEP_FRAMES = False
+DEFAULT_TL_COMPILE_HOUR = 0

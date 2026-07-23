@@ -2,7 +2,7 @@
 
 The camera's proprietary P4P/H.264 stream is captured by a vendored pure-Python
 client and transcoded to MJPEG by ffmpeg on the HA host, then served natively
-by Home Assistant. No cloud, no go2rtc dependency.
+by Home Assistant. No cloud, no go2rtc dependency. Includes a time-lapse switch.
 """
 
 from __future__ import annotations
@@ -13,15 +13,26 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .coordinator import RbxS73Device
+from .timelapse import TimelapseManager
 
-PLATFORMS: list[Platform] = [Platform.CAMERA]
+PLATFORMS: list[Platform] = [Platform.CAMERA, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up RBX-S73 from a config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = RbxS73Device(hass, entry)
+    device = RbxS73Device(hass, entry)
+    device.timelapse = TimelapseManager(hass, device, entry)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = device
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Re-apply time-lapse schedule when options change."""
+    device: RbxS73Device | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if device and device.timelapse:
+        await device.timelapse.async_reschedule()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -30,5 +41,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded:
         device: RbxS73Device = hass.data[DOMAIN].pop(entry.entry_id, None)
         if device:
+            if device.timelapse:
+                await device.timelapse.async_stop()
             await device.async_stop()
     return unloaded

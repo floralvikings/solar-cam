@@ -29,6 +29,24 @@ the same camera at the same time.
 Trade-off: MJPEG is heavier on LAN bandwidth and carries no audio. An optional
 H.264-passthrough path (go2rtc/WebRTC) and PTZ controls are planned follow-ups.
 
+### Time-lapse
+
+Each camera exposes a **Time-lapse** switch. Turn it on and the integration
+captures a snapshot on a schedule (reusing the shared session) and, once a day,
+compiles the previous day's frames into an mp4. Configure via the integration's
+**Configure** button:
+
+- **Frames to capture / Per** — the capture rate, e.g. `4` per `hour` (default,
+  one every 15 min) or `1` per `day`. Each capture wakes the camera ~10s, so
+  keep it modest on a solar/battery unit.
+- **Output video frame rate**, **daily auto-compile hour** (`-1` disables),
+  **keep individual frames**, and the **output directory** (default
+  `/media/rbx_s73`, so results show in HA's Media browser).
+
+Frames land in `<dir>/<uid>/frames/<YYYYMMDD>/`, videos in
+`<dir>/<uid>/timelapse-<YYYYMMDD>.mp4`. The `rbx_s73.compile_timelapse` service
+(target the Time-lapse switch, optional `date: YYYYMMDD`) compiles on demand.
+
 ## Status
 
 **Phase 1 — read-only analysis tooling (this commit).** No captures taken yet.

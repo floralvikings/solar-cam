@@ -17,5 +17,42 @@
     "abort": {
       "already_configured": "This camera is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Time-lapse settings",
+        "description": "Turn capture on/off with the camera's Time-lapse switch. Set how many frames to capture per minute, hour, or day. Each capture briefly wakes the camera (~10s), so keep the rate sane on a solar/battery unit.",
+        "data": {
+          "timelapse_rate": "Frames to capture",
+          "timelapse_rate_unit": "Per",
+          "timelapse_fps": "Output video frame rate (fps)",
+          "timelapse_compile_hour": "Daily auto-compile hour (0-23, or -1 to disable)",
+          "timelapse_keep_frames": "Keep individual frames after compiling",
+          "timelapse_dir": "Output directory"
+        }
+      }
+    }
+  },
+  "selector": {
+    "tl_rate_unit": {
+      "options": {
+        "minute": "minute",
+        "hour": "hour",
+        "day": "day"
+      }
+    }
+  },
+  "services": {
+    "compile_timelapse": {
+      "name": "Compile time-lapse",
+      "description": "Compile a day's captured frames into an mp4 now.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Day to compile as YYYYMMDD (defaults to today)."
+        }
+      }
+    }
   }
 }

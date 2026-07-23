@@ -7,10 +7,38 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.helpers.selector import TextSelector
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+)
 
-from .const import CONF_CLIENT_IP, CONF_HOST, CONF_UID, DOMAIN
+from .const import (
+    CONF_CLIENT_IP,
+    CONF_HOST,
+    CONF_TL_COMPILE_HOUR,
+    CONF_TL_DIR,
+    CONF_TL_FPS,
+    CONF_TL_KEEP_FRAMES,
+    CONF_TL_RATE,
+    CONF_TL_RATE_UNIT,
+    CONF_UID,
+    DEFAULT_TL_COMPILE_HOUR,
+    DEFAULT_TL_DIR,
+    DEFAULT_TL_FPS,
+    DEFAULT_TL_KEEP_FRAMES,
+    DEFAULT_TL_RATE,
+    DEFAULT_TL_RATE_UNIT,
+    DOMAIN,
+    TL_UNIT_SECONDS,
+)
 from .p4p.lansearch import discover
 
 
@@ -41,6 +69,11 @@ class RbxS73ConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> "RbxS73OptionsFlow":
+        return RbxS73OptionsFlow()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -70,3 +103,45 @@ class RbxS73ConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+
+class RbxS73OptionsFlow(OptionsFlow):
+    """Time-lapse options."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        opts = self.config_entry.options
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_TL_RATE, default=opts.get(CONF_TL_RATE, DEFAULT_TL_RATE)
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=600)),
+                vol.Optional(
+                    CONF_TL_RATE_UNIT,
+                    default=opts.get(CONF_TL_RATE_UNIT, DEFAULT_TL_RATE_UNIT),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(TL_UNIT_SECONDS), translation_key="tl_rate_unit"
+                    )
+                ),
+                vol.Optional(
+                    CONF_TL_FPS, default=opts.get(CONF_TL_FPS, DEFAULT_TL_FPS)
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                vol.Optional(
+                    CONF_TL_COMPILE_HOUR,
+                    default=opts.get(CONF_TL_COMPILE_HOUR, DEFAULT_TL_COMPILE_HOUR),
+                ): vol.All(vol.Coerce(int), vol.Range(min=-1, max=23)),
+                vol.Optional(
+                    CONF_TL_KEEP_FRAMES,
+                    default=opts.get(CONF_TL_KEEP_FRAMES, DEFAULT_TL_KEEP_FRAMES),
+                ): bool,
+                vol.Optional(
+                    CONF_TL_DIR, default=opts.get(CONF_TL_DIR, DEFAULT_TL_DIR)
+                ): TextSelector(),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
