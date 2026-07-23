@@ -105,6 +105,27 @@ def test_high_bandwidth_flow_detected():
     assert hb[0].bytes_total == 200 * 1400
 
 
+def test_high_bandwidth_ignores_short_bursts():
+    # 4-packet DHCP-like exchange over 8ms: a huge nominal byte-rate but far
+    # too short/small to be video. Must NOT be flagged.
+    rows = [
+        _p(i, 100.0 + i * 0.002, 342, "192.168.88.1", CAM, 67, 68, proto="DHCP")
+        for i in range(4)
+    ]
+    s = summarize(rows, camera_ip=CAM)
+    assert high_bandwidth_flows(s.conversations.values()) == []
+
+
+def test_high_bandwidth_ignores_short_tcp_handshake():
+    # 12 packets, ~800 bytes, 0.02s -> ~40KB/s nominal but not video.
+    rows = [
+        _p(i, 100.0 + i * 0.002, 68, CAM, CLOUD, 48946, 80, l4="tcp", proto="TCP")
+        for i in range(12)
+    ]
+    s = summarize(rows, camera_ip=CAM)
+    assert high_bandwidth_flows(s.conversations.values()) == []
+
+
 def test_keepalive_flow_detected():
     # small, regularly-spaced packets every 1s -> keepalive
     rows = []

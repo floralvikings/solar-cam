@@ -204,12 +204,25 @@ def high_bandwidth_flows(
     *,
     min_bytes: int = 100_000,
     min_bps: float = 20_000.0,
+    min_duration_for_rate: float = 1.0,
+    min_packets_for_rate: int = 20,
 ) -> list[Conversation]:
-    """Flows likely to carry video/audio: high total bytes or byte-rate."""
-    out = [
-        c
-        for c in convs
-        if c.bytes_total >= min_bytes or c.bytes_per_second >= min_bps
-    ]
+    """Flows likely to carry video/audio: high total bytes or byte-rate.
+
+    The byte-rate test is only applied to flows that lasted long enough and
+    carried enough packets to have a meaningful rate. Without that guard a
+    4-packet DHCP exchange spanning 8ms "achieves" 167 KB/s and masquerades
+    as video; likewise short TCP handshakes.
+    """
+    out = []
+    for c in convs:
+        if c.bytes_total >= min_bytes:
+            out.append(c)
+        elif (
+            c.duration >= min_duration_for_rate
+            and c.packets >= min_packets_for_rate
+            and c.bytes_per_second >= min_bps
+        ):
+            out.append(c)
     out.sort(key=lambda c: c.bytes_total, reverse=True)
     return out
