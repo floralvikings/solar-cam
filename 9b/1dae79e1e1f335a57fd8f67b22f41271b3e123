@@ -1,0 +1,21 @@
+scripts/pcaptools/analyze.py
+  s_76f8a99bc79680::t_57a8567f291397 207-208,210-226
+tests/test_analyze.py
+  s_76f8a99bc79680::t_f58ceb45d75789 108-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9b1dae79e1e1f335a57fd8f67b22f41271b3e123",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
