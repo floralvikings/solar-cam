@@ -146,6 +146,28 @@ wire:  p4p obfuscate( header(msgtype 0x140a) + KCP segment( H.264 / AV ) )
 Status: camera reaches "session open, retransmitting 0x1308" with our current
 client; the KCP connect is the last unimplemented step.
 
+### ✅ REAL SESSION DECODED (2026-07-23, Wi-Fi monitor capture, decrypted)
+
+Captured + decrypted the real UBox↔camera session (`rbx-realsession.pcap`,
+phone `.109:48447` ↔ camera `.113:50694`). Camera→phone video decoded cleanly:
+
+- **P4P `0x140a`, aux = `0x18`** carries the video (my probe used aux=0 — wrong).
+- **KCP inside**: `conv=0xf0a05237`, cmd=`81` (IKCP_CMD_PUSH), frg=0, wnd=256,
+  sn increasing, `len≈272` per segment (large frames span many segments).
+- **conv is CLIENT-CHOSEN** (per-session; `0xf0a05237` ≠ the 0x1308 session_id).
+  It is the `sess+0xc` value the client puts in `lanstreamreq` at **body[72]** —
+  my probe left it zero, so the camera had no conv and never pushed. **This was
+  the missing piece.**
+- **AV frame header** (start of each frame in the reassembled KCP stream):
+  `13 00 00 00 | 00 00 | size16? | 00 01 | 00 00 | timestamp(u32) | 8f 00 0e 00 |
+  … | framelen(u32)`. Frame data follows and spans KCP segments; reassembled by
+  `ikcp_recv`. (Codec/whether AV is further encrypted TBD once we receive a full
+  stream via our own non-lossy client.)
+
+**Corrected client recipe:** choose a `conv` (randomID) → `lanstreamreq` with
+conv at body[72] → `0x1308` → drive KCP (conv, wnd256, nodelay/10) over `0x140a`
+aux=0x18: send ACKs (cmd 82), `ikcp_input` the pushes, `ikcp_recv` → AV frames.
+
 ## State machine (client peer side) — general (P2P/relay)
 
 1. **`p4p_mgmt_init`** — allocate the 4 crypto buffers (`p4p_crypto_init`), etc.
