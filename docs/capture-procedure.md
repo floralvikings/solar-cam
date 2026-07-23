@@ -122,6 +122,59 @@ also catch DHCP/DNS at boot you can widen the filter or add
 
 ---
 
+## Next capture: live view / pan (ready-to-paste)
+
+**Setup first — this matters:** put the **phone on a different AP or VLAN than
+the camera**. If they share an AP, direct phone↔camera P2P is bridged inside
+the AP and never reaches the router, so a router-side capture cannot tell
+"direct P2P" from "cloud relay" — the exact question this capture must answer.
+
+```rsc
+# 0. Check headroom -- a video capture is much bigger than the idle one
+/system resource print
+# 0b. Find the phone's IP
+/ip dhcp-server lease print
+
+# 1. Configure: camera + phone, ONE interface (avoids the duplicate-frame
+#    artifact), write to file
+/tool sniffer set filter-ip-address=192.168.88.113/32,<PHONE_IP>/32 \
+    filter-interface=bridge \
+    streaming-enabled=no \
+    file-name=rbx-live.pcap file-limit=30000
+
+# 2. Capture ONE action
+/tool sniffer start
+#      -> in UBox: open live view, watch ~60s, close it
+/tool sniffer stop
+
+# 3. Second capture isolating PAN
+/tool sniffer set file-name=rbx-pan.pcap
+/tool sniffer start
+#      -> open live view, then press PAN only
+/tool sniffer stop
+
+/file print where name~"rbx"
+```
+
+`file-limit` is in **KB** (30000 ≈ 30 MB). If free space is tight, shorten the
+live view or use Method C (stream to the Mac) instead.
+
+Download and analyze:
+
+```bash
+scp -O admin@192.168.88.1:rbx-live.pcap captures/
+scp -O admin@192.168.88.1:rbx-pan.pcap  captures/
+
+export PATH="/opt/homebrew/bin:$PATH"
+.venv/bin/python scripts/compare_sessions.py \
+    idle=captures/rbx-idle.pcap \
+    live=captures/rbx-live.pcap \
+    pan=captures/rbx-pan.pcap \
+    --camera-ip 192.168.88.113
+```
+
+---
+
 ## Method C — MikroTik sniffer → live stream to Wireshark on the Mac
 
 Router streams matching packets (TZSP, UDP/37008) to the Mac; Wireshark
