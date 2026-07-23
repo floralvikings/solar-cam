@@ -10,6 +10,54 @@ Possible / Unknown**.
 
 ---
 
+## 2026-07-23 — LAN discovery works; obfuscation fully broken
+
+**Conditions:** Mac (`192.168.88.20`) and camera on the same LAN. Two parts:
+(a) captured the UBox app's LAN-search broadcast; (b) static analysis of
+`libUBICAPIs.so` with pyelftools + capstone.
+
+**Observed (facts):**
+- Captured `captures/lansearch.pcap`: the app broadcasts a **36-byte plaintext**
+  request to `<subnet>.255:32762` ~33× at ~200 ms; carries the 20-char device
+  UID with a uint16-LE length at offset 4 (see `protocol-notes.md`).
+- Reproduced the request with `probe_camera.py --uid` and the **camera replied
+  directly to the Mac** from `192.168.88.113:32762` with a **408-byte** response
+  — no cloud, no phone. First reply came ~7 s into a repeated probe *while live
+  view was open* (see wake question below).
+- Response is obfuscated: 25×16-byte blocks + 8-byte ascii trailer.
+- `libUBICAPIs.so` symbol table exposed the routines directly: `p4p_XOR`,
+  `p4p_Swap`, `p4p_DWORDbitshift`, `p4p_crypto_encode/decode/init`, and a
+  hardcoded key in `.rodata`.
+- Disassembly → the transform is: per 16B block, ROTR words by (off+1), XOR
+  32-byte key, Swap16 (fixed permutation), ROTR words by (off+3). **Key =
+  `"I believe 1 ^ill win the battle!"`** (hardcoded, same for all installs).
+- Implemented `pcaptools/ubia_crypto.py`; it **round-trips real wire bytes**
+  and decodes the response to plaintext: magic `07181000`, msgtype `0x1302`,
+  the device UID, the account username, and a credential string.
+
+**Interpretation:**
+- **Cloud-free local access is real.** Tag: **Confirmed.** We can discover the
+  camera and read its identity/credentials over pure LAN.
+- The "encryption" is keyless-in-practice obfuscation. Tag: **Confirmed.**
+- **Security finding:** the camera hands UID + account + credential to *any*
+  unauthenticated LAN host. Tag: **Confirmed.** Logged in
+  `cloud-dependencies.md`. Secrets kept out of git.
+- One transform covers LAN **and** cloud (shared header family) → we should be
+  able to decode the earlier UDP 10240/20001 + TCP 443 captures too.
+
+**Wake question (open):** the very first single-shot probe got no reply; a reply
+came only after repeats *with live view open*. Leading hypothesis: the LAN
+responder runs only while the camera is awake (`CLI_SESSION_WAKEUP = 1`). User
+is leaving the camera cold to re-test without opening the app.
+
+**Next experiment:**
+1. Cold re-probe (camera untouched, app closed) → does it still answer?
+2. `ubia_crypto.decode` the idle-capture UDP 10240/20001 + TCP 443 payloads.
+3. Map the LanSearchInfo response fields; then try a full LAN session
+   (`send_ioctrl` with the PTZ opcodes).
+
+---
+
 ## 2026-07-23 — UBox APK: SDK is a rebranded TUTK; LAN mode exists
 
 **Conditions:** APK pulled via `adb` from an owned Galaxy S23 Ultra

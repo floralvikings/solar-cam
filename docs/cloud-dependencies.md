@@ -56,12 +56,18 @@ Four servers, contacted on **both** transports simultaneously and held open:
 | LAN-only live view works after cloud init | Needs Test B | Unknown |
 | LAN-only works from cold (no cloud at all) | Needs Test D | Unknown |
 
-## Privacy note
+## Privacy / security notes
 
-Even with no user interaction, the camera **uploaded ~336 KB of
-encrypted/compressed media to a cloud server** during a 5.7-minute idle
-capture, and generated ~8,700 DNS queries. This is worth flagging independent
-of the Home Assistant goal.
+1. Even with no user interaction, the camera **uploaded ~336 KB of
+   encrypted/compressed media to a cloud server** during a 5.7-minute idle
+   capture, and generated ~8,700 DNS queries.
+2. **Unauthenticated LAN credential disclosure (Confirmed, 2026-07-23):** the
+   camera answers a proprietary UDP LAN-search (port 32762) from *any* host and
+   returns the device UID, account username, and a credential string. The
+   "encryption" is a fixed obfuscation with a key hardcoded in the app
+   (`ubia_crypto.py`), so this is effectively cleartext to anyone on the LAN.
+   Mitigation for the final lockdown: isolate the camera on its own VLAN and
+   block unsolicited LAN clients → camera (already in the lockdown goal).
 
 ## Provisional lockdown readiness
 - [x] Vendor endpoints enumerated (`*.ubianet.com` pool + 4 media servers)

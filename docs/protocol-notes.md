@@ -108,26 +108,53 @@ P2P network. Never commit it; pass it via `--uid` at runtime.
 
 The app broadcasts this ~33× at ~200 ms intervals (retry behaviour).
 
-### Response (408 bytes, obfuscated)
-```
-25 x 16-byte blocks  +  8-byte ASCII trailer ("2udb5ekC"-style token)
-11 unique blocks; one block repeats 15x (empty/padding records)
-```
-Analysis so far:
-- Identical plaintext → identical ciphertext at 16-byte alignment ⇒ a
-  **static, position-independent block transform**.
-- **Not** a strong block cipher: different message types share long common
-  prefixes and differ in only a few bytes
-  (`04a48c0d62bcd8d2…` LAN vs `04ac9d2d62bcd8d2…` cloud/10240), where AES
-  would avalanche. Tag: **Strongly indicated.**
-- The UID is **not** recoverable by single-byte XOR nor by any repeating XOR
-  key of period 4/8/16. So it is more than trivial XOR (substitution table or
-  similar), or the UID simply is not echoed. Tag: **Confirmed** (negative).
-- The response shares the header family of the cloud traffic
-  (`…2d62bcd8d2…`), i.e. one transform is used on both LAN and cloud paths.
+### Response (408 bytes, obfuscated) — **DECODED** ✅
 
-**Next:** locate the transform in `libUBICAPIs.so` rather than guess — see
-`apk-analysis.md`.
+The obfuscation is fully reversed. It is not encryption: a fixed transform with
+a **hardcoded key** shipped in every copy of the app. Implemented in
+`scripts/pcaptools/ubia_crypto.py` (`encode`/`decode`), verified to reproduce
+real wire bytes exactly, 12 unit tests.
+
+**Transform** (from `libUBICAPIs.so`; SDK calls it `p4p_crypto_encode`), per
+16-byte block:
+1. `p4p_DWORDbitshift` — rotate each 4-byte LE word right by (offset+1) → 1,5,9,13
+2. `p4p_XOR` with the 32-byte key (blocks use the first 16 bytes)
+3. `p4p_Swap` — fixed 16-byte permutation `[11,9,8,15,13,10,12,14,2,1,5,0,6,4,7,3]`
+4. `p4p_DWORDbitshift` — rotate each word right by (offset+3) → 3,7,11,15
+
+Trailing partial block: XOR+Swap only, no rotations.
+
+**The key** (`.rodata` 0xb7b1, hardcoded ASCII, 32 bytes):
+```
+I believe 1 ^ill win the battle!
+```
+This is not a secret — it is identical for every device/app install — so it is
+safe to keep in the repo. Device UIDs and passwords are the secrets.
+
+**Decoded LAN-search response** (a `LanSearchInfo` record):
+```
+07 18 10 00        magic
+88 01              uint16 LE length (0x0188)
+90 a8              ...
+02 13              msgtype 0x1302  (response; request was 0x1301)
+<20-byte device UID> "1"
+<account username>       <- e.g. "admin"
+<credential/token string>
+...mostly-empty padding records...
+8-byte ascii trailer token
+```
+
+### ⚠️ SECURITY FINDING — credentials exposed on the LAN
+The camera returns the **device UID, the account username, and a credential
+string** to *any* LAN host that sends the (plaintext) LAN-search request — no
+authentication. After the trivial deobfuscation above, these are cleartext.
+This is our route to local access **and** a genuine vulnerability worth noting
+in `cloud-dependencies.md`. These values are treated as secrets and kept out of
+the repo (`.gitignore` + a pre-commit-style scan).
+
+The same transform is used on the **cloud** channels too (shared header family
+`…2d62bcd8d2…`), so `ubia_crypto.decode` should also open the UDP 10240/20001
+and TCP 443 payloads for analysis.
 
 ### Open question: does the camera need waking first?
 The first probe attempt got **no reply**; a reply arrived on a later attempt

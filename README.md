@@ -43,7 +43,9 @@ active probe. All accept `--json` for machine-readable output.
 | `compare_sessions.py` | Diff captures (idle vs live/pan/tilt/wan-blocked) → flows & DNS names unique to each scenario |
 | `extract_dns.py` | Every DNS query + answer (maps cloud dependencies) |
 | `udp_flow_report.py` | Fingerprint proprietary UDP flows: payload lengths, header bytes, entropy, sequence-counter fields |
-| `probe_camera.py` | Liveness + targeted TCP/RTSP/ONVIF-WS-Discovery/SSDP probe (non-destructive) |
+| `probe_camera.py` | Liveness + TCP/RTSP/ONVIF/SSDP probe **and UBIA/TUTK LAN discovery** (`--uid`) |
+| `ubia_decode.py` | Decode/encode UBIA/TUTK P4P packet obfuscation (reversed from the SDK) |
+| `apk_recon.py` | First-pass recon of the UBox APK (SDK/endpoints/command IDs) |
 
 ### Examples
 
