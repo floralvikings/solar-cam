@@ -1,0 +1,21 @@
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_2dd6446815d0b4 159-171
+docs/research-log.md
+  s_76f8a99bc79680::t_b28536fd5b3d57 48-53,56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4678bf13e91f5ab264d8fe32cb8f35911cca4ef1",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
