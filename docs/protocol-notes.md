@@ -170,6 +170,53 @@ implication for the bridge: on connect, **retry LAN-search for ~5–10 s** to
 allow radio warmup before giving up. High, variable ping RTT (250–730 ms) is
 consistent with 802.11 power-save (DTIM buffering).
 
+## Cloud control protocol — DECODED (2026-07-23, from `rbx-idle.pcap`)
+
+Running `ubia_crypto.decode` over the idle capture's cloud payloads: **every**
+UDP 10240/20001 payload decodes to the P4P magic `07181000`. TCP 443 is a
+separate, **plaintext** channel. Header framing:
+
+```
+07 18 10 00 | <u16 LE length> | <u16 msgtype> | <session/flags> | body...
+```
+
+### Message-type map (msgtype at offset 8, LE) — **Confirmed**
+| msgtype | Dir | Port | Meaning |
+|---------|-----|------|---------|
+| `0x1001` / `0x1002` | cam↔srv | 10240 | Rendezvous **lookup** (register UID / get server+peer list) |
+| `0x1101` / `0x1102` | cam↔srv | 20001 | **Session connect** req/resp |
+| `0x1105` / `0x1106` | srv↔cam | 20001 | **Peer address exchange** (LAN/WAN) — hole-punch |
+| `0x110d` / `0x110e` | cam↔srv | 20001 | Session sub-negotiation (small) |
+| `0x1301` / `0x1302` | local | 32762 | **LAN search** (see above) |
+| `0x1406` / `0x1409` | cam↔srv | 20001 | Keepalive (carries session id `37e027d9`) |
+| `0x140a` | cam→srv | 20001 | **Bulk data / media upload** (the 336 KB event clip) |
+
+### 🔑 Hole-punching confirmed — direct P2P is the intended path
+In the session-setup messages the cloud exchanges each peer's **LAN** address:
+- `0x1105` (srv→cam) contains the **phone's** LAN addr `192.168.88.111:34755`
+- `0x1106` (cam→srv) contains the **camera's** LAN addr `192.168.88.113:33900`
+
+(plus a consistent NAT-mapped **WAN** address — the site's public IP, redacted).
+This is classic ICE/STUN-style rendezvous: the cloud brokers the introduction,
+then peers connect **directly**. When phone and camera share a LAN, video should
+flow **phone↔camera directly**, not via the cloud. Tag: **Strongly indicated**
+(confirm with the live-view capture; the idle capture has no phone-side view).
+
+⇒ **Bridge strategy:** a local daemon can act as the *client peer* — do the LAN
+search, open a session, and receive the AV stream directly from the camera on
+the LAN, skipping the cloud (which the LAN-search path already proves reachable).
+
+### TCP 443 — plaintext presence channel (NOT P4P, not TLS) — **Confirmed**
+Bytewise ASCII key/value, no obfuscation:
+- cam→srv: `uid=<UID>`, `hostalive=<UID>…`, `iotalive=<UID>…` (heartbeats)
+- srv→cam: 32-byte status records (`<UID> + 12 bytes`), repeated
+
+### Media body (`0x140a`) — still opaque
+The `0x140a` header decodes, but the bulk body stays high-entropy after
+deobfuscation (matches the earlier 7.5 bits/byte) → the AV payload is
+compressed/encrypted **beneath** the transport obfuscation. Decoding the AV
+codec is a later, separate problem from getting a local session.
+
 ## Connectivity-check loop (noise, not protocol) — **Confirmed**
 
 86% of the idle capture (8,768 packets) is DNS. The camera repeatedly resolves

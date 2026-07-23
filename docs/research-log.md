@@ -54,9 +54,45 @@ cloud.** Tag: **Confirmed.** Bridge should retry LAN-search ~5–10 s on connect
 
 **Next experiment:**
 1. ~~Cold re-probe~~ done — warmup, not cloud-wake.
-2. `ubia_crypto.decode` the idle-capture UDP 10240/20001 + TCP 443 payloads.
+2. ~~Decode cloud payloads~~ done — see next entry.
 3. Map the LanSearchInfo response fields; then try a full LAN session
    (`send_ioctrl` with the PTZ opcodes).
+
+---
+
+## 2026-07-23 — Cloud payloads decoded; hole-punch signaling confirmed
+
+**Conditions:** offline analysis of `rbx-idle.pcap` with `ubia_crypto.decode`.
+No camera interaction.
+
+**Observed (facts):**
+- **Every** UDP 10240/20001 payload decodes to P4P magic `07181000` with the
+  same transform used for LAN search. Header: `07181000 | u16 len | u16 msgtype`.
+- Message-type map (Confirmed): `0x1001/2` rendezvous lookup (10240);
+  `0x1101/2` session connect, `0x1105/6` peer-address exchange, `0x1406/9`
+  keepalive, `0x140a` bulk/media upload (20001); `0x1301/2` LAN search (32762).
+- **TCP 443 is plaintext**, not P4P and not TLS: `uid=<UID>`, `hostalive=<UID>`,
+  `iotalive=<UID>` heartbeats cam→srv; 32-byte `<UID>+12B` status records
+  srv→cam.
+- Session-setup carries **LAN addresses of both peers**: `0x1105` (srv→cam)
+  has the phone `192.168.88.111:34755`; `0x1106` (cam→srv) has the camera
+  `192.168.88.113:33900`; plus a repeated NAT-mapped WAN IP (redacted).
+- `0x140a` media body stays high-entropy after deobfuscation (AV is
+  compressed/encrypted beneath the transport layer).
+
+**Interpretation:**
+- Whole cloud control plane is now readable with our codec. Tag: **Confirmed.**
+- Cloud is a **rendezvous/hole-punch broker**; direct phone↔camera P2P is the
+  intended data path on a shared LAN. Tag: **Strongly indicated** (needs the
+  live-view capture to see the media actually flow phone↔camera).
+- **Bridge plan crystallizing:** a local daemon acts as the *client peer* — LAN
+  search → session connect → receive AV directly from the camera, no cloud.
+
+**Next experiment:**
+1. **Live-view capture** (phone + camera same LAN) → confirm the AV path is
+   direct `192.168.88.111 ↔ .113` and capture a full session handshake.
+2. Map `0x1101`/`0x1102` session fields; then replay a minimal LAN session from
+   a script and try `send_ioctrl` PTZ.
 
 ---
 

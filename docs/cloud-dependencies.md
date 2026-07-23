@@ -48,11 +48,11 @@ Four servers, contacted on **both** transports simultaneously and held open:
 | Camera holds a **persistent outbound control connection** | TCP 443 to 4 servers, 20–37 B heartbeats every ~6–10 s; UDP 20001 keepalive every ~30 s | **Confirmed** |
 | Camera registers with a **rendezvous server pool** | Identical 16-B header sent 6× to multiple `m*.ubianet.com` on UDP 10240 | **Strongly indicated** |
 | Camera **uploads media to the cloud unprompted** | 336 KB burst, entropy 7.5, camera→`170.101.97.156:20001` at t≈190 s while "idle" | **Strongly indicated** |
-| Control traffic on 443 is **not TLS** | 0 TLS handshakes across 511 packets | **Confirmed** |
-| Cloud used for authentication only | — | Unknown |
-| Cloud performs P2P signaling (hands out peer/relay) | Rendezvous pattern fits, not yet proven | Possible |
-| Media relayed via cloud vs direct P2P | Needs live-view capture with phone | Unknown |
-| Media travels directly phone↔camera on LAN | Needs live-view capture, phone off camera's AP | Unknown |
+| Control traffic on 443 is **not TLS** | 0 TLS handshakes; decoded as plaintext `uid=`/`hostalive=`/`iotalive=` heartbeats | **Confirmed** |
+| Cloud performs P2P signaling (hands out peer/relay) | Decoded `0x1101/0x1102` session-connect + `0x1105/0x1106` peer-address exchange | **Confirmed** |
+| Cloud is a **rendezvous/hole-punch broker** | `0x1105` carries phone LAN `192.168.88.111:34755`; `0x1106` carries camera LAN `192.168.88.113:33900` | **Strongly indicated** |
+| Media relayed via cloud vs direct P2P | Idle-capture event clip (`0x140a`) went to a cloud media server; live-view phone↔camera path still needs a live capture | **Possible** (both used) |
+| Media travels directly phone↔camera on LAN | LAN addresses are exchanged → direct path intended; confirm with live-view capture | **Strongly indicated** |
 | LAN-only live view works after cloud init | Needs Test B | Unknown |
 | LAN-only works from cold (no cloud at all) | Needs Test D | Unknown |
 
