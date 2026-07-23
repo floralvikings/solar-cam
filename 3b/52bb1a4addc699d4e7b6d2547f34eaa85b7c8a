@@ -1,0 +1,25 @@
+p4p/client.py
+  s_a6061006c7ef24::t_59618a37eca6fd 1-140
+p4p/kcp.py
+  s_a6061006c7ef24::t_27351a5e751faf 1-80
+scripts/capture_h264.py
+  s_a6061006c7ef24::t_462a5b369f7bfe 1-71
+tests/test_kcp.py
+  s_a6061006c7ef24::t_136c70ab49f451 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3b52bb1a4addc699d4e7b6d2547f34eaa85b7c8a",
+  "prompts": {},
+  "sessions": {
+    "s_a6061006c7ef24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0eb50487-34fe-481b-9ae8-93b6ba2bf0f7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
