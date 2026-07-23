@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add RBX-S73 camera",
+        "description": "Enter the camera's local IP and its 20-character device UID (from the UBox app or the camera label). The view password is discovered automatically. Home Assistant must be on the same LAN as the camera.",
+        "data": {
+          "host": "Camera IP address",
+          "uid": "Device UID (20 chars)",
+          "client_ip": "This Home Assistant host's LAN IP (leave blank to auto-detect)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the camera on the LAN (LAN-search got no reply). Check the IP/UID and that HA is on the same subnet."
+    },
+    "abort": {
+      "already_configured": "This camera is already configured."
+    }
+  }
+}
