@@ -194,9 +194,35 @@ descriptor at body[44:108] (`sess+0x108`) that we currently zero — was never
 seen. That descriptor (stream index / quality / channel setup) is almost
 certainly what makes the camera start streaming.
 
-**To finish:** capture a FRESH session start (force-close UBox so it tears down,
-start sniffer, then open UBox → live view) to record the phone's real
-`lanstreamreq` bytes; replicate them. Everything else in the pipeline is done.
+### ⛔ The gate is AUTH — `p4p_device_auth` (confirmed by disassembly + live tests)
+
+The lanstreamreq handler calls `p4p_device_auth`; on failure (`w0 != 0`) the
+device calls `p4p_device_free_session` → **no video**. `p4p_device_auth`:
+- `p4p_same_uid(...)` — UID must match (ours does).
+- `memcmp(req_password_16, device_password_16)` (or a custom cb at `cfg[0xc8]`)
+  — a **16-byte view password** must match the value stored on the camera.
+- Client side: `send_lanstreamreq` copies this 16-byte password from `sess+0xf8`
+  into the request body (our best offset inference: **body[76:92]**).
+
+**Tried and REJECTED (fresh source port each, so genuine re-auth):**
+- the LanSearchInfo broadcast credential `…` at every offset body[44..88];
+- common defaults (`admin`,`123456`,`888888`,`666666`,`000000`,blank,zeros,…) at body[76].
+
+So the view password is neither the broadcast credential nor a common default —
+it is the per-device value bound in UBox (likely a **cloud-provisioned token**,
+not the user's account password, since the local account is `admin`). Also
+unconfirmed: the exact body offset, and whether the compare is raw or via the
+`cfg[0xc8]` callback.
+
+**To finish (need one of):**
+1. **Frida** on the phone → hook `p4p_client_send_lanstreamreq` (or `p4p_XOR`/
+   `p4p_send_udp`) and dump the exact request bytes = the password value **and**
+   its offset, definitively. Then `build_lanstreamreq(..., password=…)` completes
+   the client. (`build_lanstreamreq` already takes `password`/`password_offset`.)
+2. The real per-device view password, if obtainable from UBox/device.
+
+Everything else in the pipeline — discovery, obfuscation, session open, alive,
+KCP ACK/receive, AV framing — is done and verified.
 
 ## State machine (client peer side) — general (P2P/relay)
 

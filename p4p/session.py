@@ -31,18 +31,38 @@ from .packet import MAGIC, MsgType, build, parse_plain
 LAN_STREAM_REQ_LEN = 108
 
 
-def build_lanstreamreq(uid: str, *, stream_index: int = 0) -> bytes:
+def build_lanstreamreq(
+    uid: str,
+    *,
+    conv: int = 0,
+    password: bytes = b"",
+    password_offset: int = 76,
+    stream_index: int = 0,
+) -> bytes:
     """Build the obfuscated LAN stream-start request (msgtype 0x1307).
 
-    Verified: a body of const byte + UID (the other fields defaulting to 0)
-    is accepted by the camera, which responds 0x1308 with a session endpoint.
-    ``stream_index`` selects main/sub once its exact offset is pinned.
+    The camera runs ``p4p_device_auth`` on this request and **frees the session
+    (no video) unless the 16-byte view password authenticates** (verified by
+    disassembly: on auth != 0 the device calls ``p4p_device_free_session``).
+
+    Fields (from the SDK's ``send_lanstreamreq``):
+      * body[0]      = 0x01
+      * body[24:44]  = device UID (checked against the device's own UID)
+      * body[72:76]  = ``conv`` (client randomID; also the KCP conv)
+      * body[76:92]  = 16-byte **view password** (``sess+0xf8``) -- the auth gate
+
+    The password is NOT the LanSearchInfo credential and is not a common
+    default (both tried, both rejected); it is the value set when the camera
+    was bound in UBox. ``password_offset`` is exposed because the exact slot
+    is our best inference (body[76]) pending a ground-truth dump.
     """
     uid = uid.strip().upper()
     body = bytearray(LAN_STREAM_REQ_LEN)
     body[0] = 0x01
     body[24:44] = uid.encode("ascii")
-    # candidate stream-index slot (body[100]); harmless if wrong-offset for now
+    struct.pack_into("<I", body, 72, conv & 0xFFFFFFFF)
+    if password:
+        body[password_offset:password_offset + len(password[:16])] = password[:16]
     struct.pack_into("<I", body, 100, stream_index)
     return build(MsgType.LAN_STREAM_REQ, bytes(body), aux=0x21)
 
