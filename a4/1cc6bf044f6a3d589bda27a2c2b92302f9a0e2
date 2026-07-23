@@ -1,0 +1,41 @@
+docs/research-log.md
+  s_76f8a99bc79680::t_37c12c942e3e47 162-193
+p4p/session.py
+  s_76f8a99bc79680::t_07a46ca426ec84 1-80
+p4p/lansearch.py
+  s_76f8a99bc79680::t_a9b6f9bad17a62 127
+  s_76f8a99bc79680::t_afc9400cc18a2a 1-126,128-131
+p4p/packet.py
+  s_76f8a99bc79680::t_df2e387b70ef14 1-93
+p4p/crypto.py
+  s_76f8a99bc79680::t_abb4bda150668f 1-108
+scripts/p4p_discover.py
+  s_76f8a99bc79680::t_8ab350f5df11bc 1-65
+p4p/__init__.py
+  s_76f8a99bc79680::t_eace8ea69f2800 1-19
+tests/test_crypto_parity.py
+  s_76f8a99bc79680::t_32959da343b535 1-19
+tests/conftest.py
+  s_76f8a99bc79680::t_32f3bbb9e6a204 1,8-12
+tests/test_p4p_packet.py
+  s_76f8a99bc79680::t_b9b00170041b6e 10
+  s_76f8a99bc79680::t_a4358604ae8bea 1-9,11-52
+tests/test_p4p_lansearch.py
+  s_76f8a99bc79680::t_dc33bc90517bf5 1-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "a41cc6bf044f6a3d589bda27a2c2b92302f9a0e2",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
