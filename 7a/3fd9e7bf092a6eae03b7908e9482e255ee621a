@@ -1,0 +1,33 @@
+README.md
+  s_76f8a99bc79680::t_555306cebd1234 46-48
+docs/protocol-notes.md
+  s_76f8a99bc79680::t_711e78e9654213 111-127,129,131-157
+scripts/ubia_decode.py
+  s_76f8a99bc79680::t_32e5369818cb56 1-67
+tests/test_ubia_crypto.py
+  s_76f8a99bc79680::t_3db44cd7cb763e 1-56
+  s_76f8a99bc79680::t_b5744b2c63d561 57-76
+scripts/pcaptools/ubia_crypto.py
+  s_76f8a99bc79680::t_0509bbba5aa68b 1-79,84-86,89-129
+  s_76f8a99bc79680::t_a17a71b9e0d1d4 80-83,87-88
+docs/research-log.md
+  s_76f8a99bc79680::t_dd888f24135500 13-60
+docs/cloud-dependencies.md
+  s_76f8a99bc79680::t_a8f9f13e7f7a24 59-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "7a3fd9e7bf092a6eae03b7908e9482e255ee621a",
+  "prompts": {},
+  "sessions": {
+    "s_76f8a99bc79680": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688403b4-318d-49cc-8d53-14ed948cfbe4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
