@@ -129,10 +129,42 @@ our own client against the camera (our Mac↔camera traffic *is* visible to us),
 using a monitor-mode/AP capture only if we get stuck.
 
 **Next experiment:**
-1. Trace `p4p_client_start` / `p4p_client_startvideo` in `libUBICAPIs.so` to
-   derive the direct-session packet sequence + ports.
-2. Prototype a minimal LAN client (LAN-search → session connect), capturing our
-   own Mac↔camera traffic to verify each step.
+1. ~~Trace session flow in libUBICAPIs.so~~ done — see next entry.
+2. Prototype a minimal LAN client (LAN-search → session connect).
+
+---
+
+## 2026-07-23 — SDK session-flow trace: KCP transport, LAN-punch flow
+
+**Conditions:** static analysis of `libUBICAPIs.so` (ULOG format strings +
+capstone disassembly of the `send_*` builders). Full detail in
+`docs/session-flow.md`.
+
+**Observed (facts):**
+- Reliable transport is **KCP (ikcp)** — stock `ikcp_*` + `IKCP_CMD_*` symbols;
+  one KCP object per AV channel, tied to `randomID` (`kcp:%p randomID:%08x`).
+- Connection uses a client-generated **`randomID`** (`p4p_client_randomID`) then
+  **`PUNCH2LAN`** / preconnect to the camera's LAN IP with `clientLanAddr` +
+  `clientPubAddr`; device `handle_preconnectreq` registers the session.
+- Three stream modes with distinct code paths: **LAN** / P2P / RLY
+  (`send_lanstreamreq` vs `send_rlystreamreq`; `STREAMREQ_COST … (LAN|P2P|RLY)`).
+- AV frames carry `avidx/cid/streamindex/FN/tms`; H.264 (`sentIDR`, `VideoDrop`).
+- Candidate msgtypes from disassembly (noisy, to verify): ioctrl `0x1401/0x1402`,
+  lanstreamreq `0x1307`, rlystreamreq `0x1205`, preconnect `~0x110a`.
+
+**Interpretation:**
+- Full local session recipe is now known end to end: `randomID → LAN-search →
+  preconnect/PUNCH2LAN → KCP → lanstreamreq → H.264 over KCP`. Tag: **Confirmed**
+  (architecture); msgtype constants **Strongly indicated**, to pin empirically.
+- **KCP being stock is a major shortcut** — reuse an existing library rather than
+  reverse the reliability layer.
+
+**Next experiment (Phase 2 build):**
+1. Prototype a Python `p4p` client: parse `LanSearchInfo` → preconnect → KCP →
+   `lanstreamreq`, all control via `ubia_crypto`. Verify each step against our
+   own Mac↔camera tcpdump (visible since it's our traffic). Pin the candidate
+   msgtypes + field offsets.
+2. Then feed the H.264 stream to go2rtc/MediaMTX → RTSP → Home Assistant.
 
 ---
 
