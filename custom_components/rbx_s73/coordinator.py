@@ -1,10 +1,15 @@
 """Per-camera device: registers the capture pipeline with go2rtc and exposes
 an RTSP URL that Home Assistant's native stream + go2rtc can both open.
 
-Home Assistant's native `stream` worker (PyAV) cannot open a go2rtc `exec:`
-source, so we register that exec source with go2rtc's REST API under a stream
-name and return ``rtsp://127.0.0.1:<port>/<name>``. go2rtc runs the capture
-pipeline (capture.py -> ffmpeg -> go2rtc) on demand and serves plain RTSP.
+Home Assistant's native ``stream`` worker (PyAV) cannot open a go2rtc ``exec:``
+source (``Protocol not found``), so we register that exec source with go2rtc's
+REST API under a stream name and return ``rtsp://127.0.0.1:<port>/<name>``.
+go2rtc runs the capture pipeline (capture.py -> ffmpeg -> go2rtc) on demand and
+serves plain RTSP that both go2rtc and HA's native stream can consume.
+
+Registration is done lazily (on first stream request) rather than at setup:
+go2rtc is a subprocess of HA Core and may not have bound its ports yet during
+integration setup, but it is always up by the time a stream is requested.
 """
 
 from __future__ import annotations
@@ -45,7 +50,8 @@ class RbxS73Device:
         self.client_ip: str = entry.data[CONF_CLIENT_IP]
         self.entry_id: str = entry.entry_id
         self.stream_name = f"rbx_s73_{self.uid.lower()}"
-        self._rtsp_url: str | None = None
+        self._stream_url: str | None = None
+        self._lock = asyncio.Lock()
 
     def _exec_source(self) -> str:
         py = sys.executable or "python3"
@@ -55,33 +61,46 @@ class RbxS73Device:
         )
         return "exec:sh -c " + shlex.quote(pipeline)
 
-    async def async_setup(self) -> None:
-        """Register the exec source with go2rtc and resolve the RTSP URL."""
-        session = async_get_clientsession(self.hass)
+    async def async_stream_url(self) -> str | None:
+        """Ensure the go2rtc stream is registered and return its RTSP URL.
+
+        Called when HA requests the stream. Returns None (camera shows
+        unavailable) if go2rtc cannot be reached, and retries on next request.
+        """
+        if self._stream_url:
+            return self._stream_url
+        async with self._lock:
+            if self._stream_url:
+                return self._stream_url
+            session = async_get_clientsession(self.hass)
+            if not await self._register(session):
+                _LOGGER.warning(
+                    "Could not reach go2rtc at %s to register the stream. "
+                    "Is go2rtc enabled in Home Assistant? (Settings > Devices & "
+                    "Services should list a 'go2rtc' integration.)",
+                    GO2RTC_API,
+                )
+                return None
+            rtsp_port = await self._discover_rtsp_port(session)
+            self._stream_url = f"rtsp://127.0.0.1:{rtsp_port}/{self.stream_name}"
+            _LOGGER.debug("registered go2rtc stream, URL: %s", self._stream_url)
+        return self._stream_url
+
+    async def _register(self, session) -> bool:
         src = self._exec_source()
-        registered = False
-        for attempt in range(6):
+        for _ in range(3):
             try:
                 async with session.put(
                     f"{GO2RTC_API}/api/streams",
                     params={"name": self.stream_name, "src": src},
                 ) as resp:
                     if resp.status < 400:
-                        registered = True
-                        break
-                    _LOGGER.debug("go2rtc PUT status %s", resp.status)
-            except Exception as err:  # noqa: BLE001 - go2rtc may not be up yet
-                _LOGGER.debug("go2rtc not ready (%s), retrying", err)
-            await asyncio.sleep(2)
-        if not registered:
-            _LOGGER.warning(
-                "Could not register stream with go2rtc at %s; is go2rtc enabled?",
-                GO2RTC_API,
-            )
-
-        rtsp_port = await self._discover_rtsp_port(session)
-        self._rtsp_url = f"rtsp://127.0.0.1:{rtsp_port}/{self.stream_name}"
-        _LOGGER.debug("stream URL: %s", self._rtsp_url)
+                        return True
+                    _LOGGER.debug("go2rtc PUT returned %s", resp.status)
+            except Exception as err:  # noqa: BLE001 - go2rtc may be briefly down
+                _LOGGER.debug("go2rtc not reachable (%s)", err)
+            await asyncio.sleep(1)
+        return False
 
     async def _discover_rtsp_port(self, session) -> int:
         try:
@@ -100,6 +119,3 @@ class RbxS73Device:
             )
         except Exception:  # noqa: BLE001
             pass
-
-    def stream_source(self) -> str | None:
-        return self._rtsp_url

@@ -41,5 +41,8 @@ class RbxS73Camera(Camera):
         )
 
     async def stream_source(self) -> str | None:
-        """Return the RTSP URL go2rtc serves (HA native stream + go2rtc open it)."""
-        return self._device.stream_source()
+        """Return the RTSP URL go2rtc serves (HA native stream + go2rtc open it).
+
+        Registers the stream with go2rtc lazily on first request.
+        """
+        return await self._device.async_stream_url()

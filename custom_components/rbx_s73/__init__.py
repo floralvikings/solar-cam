@@ -18,10 +18,12 @@ PLATFORMS: list[Platform] = [Platform.CAMERA]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up RBX-S73 from a config entry."""
-    device = RbxS73Device(hass, entry)
-    await device.async_setup()  # register the go2rtc stream, resolve RTSP URL
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = device
+    """Set up RBX-S73 from a config entry.
+
+    The go2rtc stream is registered lazily on first stream request (go2rtc may
+    not be up yet at setup time), so setup just stores the device.
+    """
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = RbxS73Device(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
