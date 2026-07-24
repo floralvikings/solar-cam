@@ -53,6 +53,20 @@
           "description": "Day to compile as YYYYMMDD (defaults to today)."
         }
       }
+    },
+    "export_timelapse": {
+      "name": "Export time-lapse (range)",
+      "description": "Compile the frames captured between two date-times into a temporary mp4 (auto-deleted after a few hours). Browse it under Media.",
+      "fields": {
+        "start": {
+          "name": "Start",
+          "description": "Range start (local time)."
+        },
+        "end": {
+          "name": "End",
+          "description": "Range end (local time)."
+        }
+      }
     }
   }
 }

@@ -12,3 +12,27 @@ compile_timelapse:
       example: "20260723"
       selector:
         text:
+
+export_timelapse:
+  name: Export time-lapse (range)
+  description: >-
+    Compile the frames captured between two date-times into a temporary mp4
+    (auto-deleted after a few hours). Returns the file location; browse it under
+    Media. Enable "Return response" to see the path.
+  target:
+    entity:
+      integration: rbx_s73
+      domain: switch
+  fields:
+    start:
+      name: Start
+      description: Range start (local time).
+      required: true
+      selector:
+        datetime:
+    end:
+      name: End
+      description: Range end (local time).
+      required: true
+      selector:
+        datetime:

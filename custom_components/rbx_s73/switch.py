@@ -8,7 +8,8 @@ import voluptuous as vol
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import (
     AddEntitiesCallback,
@@ -29,10 +30,17 @@ async def async_setup_entry(
     device: RbxS73Device = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([RbxS73TimelapseSwitch(device)])
 
-    async_get_current_platform().async_register_entity_service(
+    platform = async_get_current_platform()
+    platform.async_register_entity_service(
         "compile_timelapse",
         {vol.Optional("date"): vol.Match(r"^\d{8}$")},
         "async_compile_service",
+    )
+    platform.async_register_entity_service(
+        "export_timelapse",
+        {vol.Required("start"): cv.datetime, vol.Required("end"): cv.datetime},
+        "async_export_service",
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
 
@@ -75,3 +83,19 @@ class RbxS73TimelapseSwitch(SwitchEntity, RestoreEntity):
     async def async_compile_service(self, date: str | None = None) -> None:
         """Entity service: compile a day's frames into an mp4 now."""
         await self._manager.async_compile(date)
+
+    async def async_export_service(self, start, end) -> dict:
+        """Entity service: export frames in a time range to a temp mp4.
+
+        Returns the on-disk path and the Media-browser location; the file is
+        auto-deleted after a few hours.
+        """
+        path = await self._manager.async_export(start, end)
+        if not path:
+            return {"exported": False, "reason": "no frames captured in that range"}
+        rel = path.split("/media/", 1)[-1] if "/media/" in path else path
+        return {
+            "exported": True,
+            "path": path,
+            "media_source": f"media-source://media_source/local/{rel}",
+        }

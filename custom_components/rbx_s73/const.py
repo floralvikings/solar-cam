@@ -29,3 +29,6 @@ DEFAULT_TL_FPS = 24
 DEFAULT_TL_DIR = "/media/rbx_s73"
 DEFAULT_TL_KEEP_FRAMES = False
 DEFAULT_TL_COMPILE_HOUR = 0
+
+# On-demand range exports are temporary: auto-deleted after this many hours.
+EXPORT_TTL_HOURS = 6

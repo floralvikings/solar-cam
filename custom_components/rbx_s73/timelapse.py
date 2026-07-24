@@ -15,10 +15,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import timedelta
+import tempfile
+from datetime import datetime, timedelta
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_time_change,
     async_track_time_interval,
 )
@@ -37,6 +39,7 @@ from .const import (
     DEFAULT_TL_KEEP_FRAMES,
     DEFAULT_TL_RATE,
     DEFAULT_TL_RATE_UNIT,
+    EXPORT_TTL_HOURS,
     TL_MIN_INTERVAL_SECONDS,
     TL_UNIT_SECONDS,
 )
@@ -181,6 +184,124 @@ class TimelapseManager:
         if not self.keep_frames:
             await self.hass.async_add_executor_job(_rmtree, day_dir)
         return out
+
+    # ---- on-demand range export --------------------------------------
+    async def async_export(self, start, end) -> str | None:
+        """Compile frames in [start, end] into a temp mp4 (auto-deleted).
+
+        Returns the output path (under <base>/exports/), or None if the range
+        held no frames. The file is removed after EXPORT_TTL_HOURS.
+        """
+        s = _to_naive_local(start)
+        e = _to_naive_local(end)
+        if e < s:
+            s, e = e, s
+        frames_root = os.path.join(self.base_dir, "frames")
+        frames = await self.hass.async_add_executor_job(
+            _collect_frames, frames_root, s, e
+        )
+        if not frames:
+            _LOGGER.warning("time-lapse export: no frames between %s and %s", s, e)
+            return None
+
+        exports_dir = os.path.join(self.base_dir, "exports")
+        name = f"export-{s:%Y%m%d-%H%M}-{e:%Y%m%d-%H%M}.mp4"
+        out = os.path.join(exports_dir, name)
+        tmp = await self.hass.async_add_executor_job(_stage_symlinks, frames)
+        try:
+            await self.hass.async_add_executor_job(_ensure_dir, exports_dir)
+            await self.hass.async_add_executor_job(_sweep_old, exports_dir)
+            cmd = [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-framerate", str(self.fps),
+                "-start_number", "0", "-i", os.path.join(tmp, "%06d.jpg"),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                out,
+            ]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                _LOGGER.error("export compile failed: %s", stderr.decode(errors="replace")[:300])
+                return None
+        finally:
+            await self.hass.async_add_executor_job(_rmtree, tmp)
+
+        _LOGGER.info("time-lapse export ready (%d frames): %s", len(frames), out)
+        async_call_later(
+            self.hass, EXPORT_TTL_HOURS * 3600, _delete_later(self.hass, out)
+        )
+        return out
+
+
+@callback
+def _delete_later(hass: HomeAssistant, path: str):
+    async def _cb(_now):
+        await hass.async_add_executor_job(_unlink, path)
+        _LOGGER.debug("expired export removed: %s", path)
+    return _cb
+
+
+def _to_naive_local(dtobj: datetime) -> datetime:
+    if dtobj.tzinfo is not None:
+        dtobj = dt_util.as_local(dtobj).replace(tzinfo=None)
+    return dtobj
+
+
+def _collect_frames(frames_root: str, start: datetime, end: datetime) -> list[str]:
+    if not os.path.isdir(frames_root):
+        return []
+    picked: list[tuple[datetime, str]] = []
+    for day in os.listdir(frames_root):
+        day_dir = os.path.join(frames_root, day)
+        if not os.path.isdir(day_dir):
+            continue
+        for fn in os.listdir(day_dir):
+            if not fn.endswith(".jpg"):
+                continue
+            try:
+                ts = datetime.strptime(day + fn[:-4], "%Y%m%d%H%M%S")
+            except ValueError:
+                continue
+            if start <= ts <= end:
+                picked.append((ts, os.path.join(day_dir, fn)))
+    picked.sort()
+    return [p for _, p in picked]
+
+
+def _stage_symlinks(frames: list[str]) -> str:
+    tmp = tempfile.mkdtemp(prefix="rbx_tl_")
+    for i, src in enumerate(frames):
+        os.symlink(src, os.path.join(tmp, f"{i:06d}.jpg"))
+    return tmp
+
+
+def _sweep_old(exports_dir: str) -> None:
+    """Remove exports older than the TTL (belt-and-suspenders vs. the timer)."""
+    import time
+
+    cutoff = time.time() - EXPORT_TTL_HOURS * 3600
+    if not os.path.isdir(exports_dir):
+        return
+    for fn in os.listdir(exports_dir):
+        path = os.path.join(exports_dir, fn)
+        try:
+            if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                os.unlink(path)
+        except OSError:
+            pass
+
+
+def _ensure_dir(path: str) -> None:
+    os.makedirs(path, exist_ok=True)
+
+
+def _unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 def _write_file(day_dir: str, path: str, data: bytes) -> None:
