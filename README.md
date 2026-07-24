@@ -47,6 +47,14 @@ Frames land in `<dir>/<uid>/frames/<YYYYMMDD>/`, videos in
 `<dir>/<uid>/timelapse-<YYYYMMDD>.mp4`. The `rbx_s73.compile_timelapse` service
 (target the Time-lapse switch, optional `date: YYYYMMDD`) compiles on demand.
 
+**On-demand range export.** The `rbx_s73.export_timelapse` service (target the
+Time-lapse switch) takes **Start** and **End** date-time pickers, compiles just
+the frames in that window into a **temporary** mp4 under `<dir>/<uid>/exports/`,
+and auto-deletes it after ~6 hours. Grab it from HA's **Media** browser. Run it
+from Settings → Automations & Scenes → **Actions** (the datetime pickers render
+there), or a dashboard button; enable "Return response" to get the file path
+back.
+
 ## Status
 
 **Phase 1 — read-only analysis tooling (this commit).** No captures taken yet.
