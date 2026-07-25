@@ -1,17 +1,24 @@
 compile_timelapse:
   name: Compile time-lapse
-  description: Compile a day's captured frames into an mp4 now.
+  description: >-
+    Compile captured frames into a saved mp4. Give a single day, or a start and
+    end date for a multi-day range. Defaults to today. Enable "Return response"
+    to get the file location.
   target:
     entity:
       integration: rbx_s73
       domain: switch
   fields:
-    date:
-      name: Date
-      description: Day to compile as YYYYMMDD (defaults to today).
-      example: "20260723"
+    start_date:
+      name: Start date
+      description: First day to include (defaults to today).
       selector:
-        text:
+        date:
+    end_date:
+      name: End date
+      description: Last day to include (defaults to the start date = single day).
+      selector:
+        date:
 
 export_timelapse:
   name: Export time-lapse (range)

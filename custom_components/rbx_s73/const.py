@@ -27,7 +27,7 @@ DEFAULT_TL_RATE = 4            # 4 frames/hour = one every 15 min
 DEFAULT_TL_RATE_UNIT = "hour"
 DEFAULT_TL_FPS = 24
 DEFAULT_TL_DIR = "/media/rbx_s73"
-DEFAULT_TL_KEEP_FRAMES = False
+DEFAULT_TL_KEEP_FRAMES = True  # keep frames by default; uncheck to reclaim space
 DEFAULT_TL_COMPILE_HOUR = 0
 
 # On-demand range exports are temporary: auto-deleted after this many hours.

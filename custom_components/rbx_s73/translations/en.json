@@ -55,11 +55,15 @@
   "services": {
     "compile_timelapse": {
       "name": "Compile time-lapse",
-      "description": "Compile a day's captured frames into an mp4 now.",
+      "description": "Compile captured frames into a saved mp4 — a single day or a multi-day range.",
       "fields": {
-        "date": {
-          "name": "Date",
-          "description": "Day to compile as YYYYMMDD (defaults to today)."
+        "start_date": {
+          "name": "Start date",
+          "description": "First day to include (defaults to today)."
+        },
+        "end_date": {
+          "name": "End date",
+          "description": "Last day to include (defaults to the start date = single day)."
         }
       }
     },

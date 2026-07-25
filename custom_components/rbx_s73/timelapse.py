@@ -154,66 +154,79 @@ class TimelapseManager:
         await self.hass.async_add_executor_job(_write_file, day_dir, path, jpeg)
         _LOGGER.debug("time-lapse frame -> %s", path)
 
-    # ---- compile ------------------------------------------------------
+    # ---- compile (single day or a range of days) ---------------------
     async def _on_daily(self, now) -> None:
         yesterday = (dt_util.as_local(now) - timedelta(days=1)).strftime("%Y%m%d")
-        await self.async_compile(yesterday)
+        await self.async_compile(yesterday, delete_after=not self.keep_frames)
 
-    async def async_compile(self, date: str | None = None) -> str | None:
-        """Compile a day's frames (YYYYMMDD, default today) into an mp4."""
-        if date is None:
-            date = dt_util.as_local(dt_util.now()).strftime("%Y%m%d")
-        day_dir = os.path.join(self.base_dir, "frames", date)
-        if not await self.hass.async_add_executor_job(_has_frames, day_dir):
-            _LOGGER.warning("time-lapse: no frames to compile for %s", date)
+    async def async_compile(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        *,
+        delete_after: bool = False,
+    ) -> str | None:
+        """Compile a day, or an inclusive range of days, into a persistent mp4.
+
+        Dates are ``YYYYMMDD``. No args = today; ``start_date`` alone = that day;
+        ``start_date`` + ``end_date`` = a multi-day range.
+        """
+        if start_date is None:
+            start_date = dt_util.as_local(dt_util.now()).strftime("%Y%m%d")
+        if end_date is None:
+            end_date = start_date
+        s, e = _day_start(start_date), _day_end(end_date)
+        if e < s:
+            s, e = _day_start(end_date), _day_end(start_date)
+
+        frames_root = os.path.join(self.base_dir, "frames")
+        frames = await self.hass.async_add_executor_job(_collect_frames, frames_root, s, e)
+        if not frames:
+            _LOGGER.warning("time-lapse: no frames to compile for %s..%s", s.date(), e.date())
             return None
-        out = os.path.join(self.base_dir, f"timelapse-{date}.mp4")
+
+        if s.date() == e.date():
+            name = f"timelapse-{s:%Y%m%d}.mp4"
+        else:
+            name = f"timelapse-{s:%Y%m%d}-{e:%Y%m%d}.mp4"
+        out = os.path.join(self.base_dir, name)
         await self.hass.async_add_executor_job(_ensure_dir, self.base_dir)
-        cmd = [
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-            "-framerate", str(self.fps),
-            "-pattern_type", "glob", "-i", os.path.join(day_dir, "*.jpg"),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-            out,
-        ]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
-        )
-        _, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            _LOGGER.error("time-lapse compile failed: %s", stderr.decode(errors="replace")[:300])
+        if not await self._render(frames, out):
             return None
-        _LOGGER.info("time-lapse compiled: %s", out)
-        if not self.keep_frames:
+        _LOGGER.info("time-lapse compiled (%d frames): %s", len(frames), out)
+        if delete_after and s.date() == e.date():
+            day_dir = os.path.join(frames_root, s.strftime("%Y%m%d"))
             await self.hass.async_add_executor_job(_rmtree, day_dir)
         return out
 
-    # ---- on-demand range export --------------------------------------
+    # ---- on-demand range export (temporary, auto-deleted) ------------
     async def async_export(self, start, end) -> str | None:
-        """Compile frames in [start, end] into a temp mp4 (auto-deleted).
-
-        Returns the output path (under <base>/exports/), or None if the range
-        held no frames. The file is removed after EXPORT_TTL_HOURS.
-        """
+        """Compile frames in the [start, end] datetime range into a temp mp4."""
         s = _to_naive_local(start)
         e = _to_naive_local(end)
         if e < s:
             s, e = e, s
         frames_root = os.path.join(self.base_dir, "frames")
-        frames = await self.hass.async_add_executor_job(
-            _collect_frames, frames_root, s, e
-        )
+        frames = await self.hass.async_add_executor_job(_collect_frames, frames_root, s, e)
         if not frames:
             _LOGGER.warning("time-lapse export: no frames between %s and %s", s, e)
             return None
-
         exports_dir = os.path.join(self.base_dir, "exports")
-        name = f"export-{s:%Y%m%d-%H%M}-{e:%Y%m%d-%H%M}.mp4"
-        out = os.path.join(exports_dir, name)
+        await self.hass.async_add_executor_job(_ensure_dir, exports_dir)
+        await self.hass.async_add_executor_job(_sweep_old, exports_dir)
+        out = os.path.join(exports_dir, f"export-{s:%Y%m%d-%H%M}-{e:%Y%m%d-%H%M}.mp4")
+        if not await self._render(frames, out):
+            return None
+        _LOGGER.info("time-lapse export ready (%d frames): %s", len(frames), out)
+        async_call_later(
+            self.hass, EXPORT_TTL_HOURS * 3600, _delete_later(self.hass, out)
+        )
+        return out
+
+    async def _render(self, frames: list[str], out: str) -> bool:
+        """Stage the chosen frames as sequential symlinks and ffmpeg -> out."""
         tmp = await self.hass.async_add_executor_job(_stage_symlinks, frames)
         try:
-            await self.hass.async_add_executor_job(_ensure_dir, exports_dir)
-            await self.hass.async_add_executor_job(_sweep_old, exports_dir)
             cmd = [
                 "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                 "-framerate", str(self.fps),
@@ -226,16 +239,11 @@ class TimelapseManager:
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
-                _LOGGER.error("export compile failed: %s", stderr.decode(errors="replace")[:300])
-                return None
+                _LOGGER.error("ffmpeg render failed: %s", stderr.decode(errors="replace")[:300])
+                return False
+            return True
         finally:
             await self.hass.async_add_executor_job(_rmtree, tmp)
-
-        _LOGGER.info("time-lapse export ready (%d frames): %s", len(frames), out)
-        async_call_later(
-            self.hass, EXPORT_TTL_HOURS * 3600, _delete_later(self.hass, out)
-        )
-        return out
 
 
 @callback
@@ -250,6 +258,16 @@ def _to_naive_local(dtobj: datetime) -> datetime:
     if dtobj.tzinfo is not None:
         dtobj = dt_util.as_local(dtobj).replace(tzinfo=None)
     return dtobj
+
+
+def _day_start(yyyymmdd: str) -> datetime:
+    return datetime.strptime(yyyymmdd, "%Y%m%d")
+
+
+def _day_end(yyyymmdd: str) -> datetime:
+    return datetime.strptime(yyyymmdd, "%Y%m%d").replace(
+        hour=23, minute=59, second=59
+    )
 
 
 def _collect_frames(frames_root: str, start: datetime, end: datetime) -> list[str]:

@@ -33,8 +33,13 @@ async def async_setup_entry(
     platform = async_get_current_platform()
     platform.async_register_entity_service(
         "compile_timelapse",
-        {vol.Optional("date"): vol.Match(r"^\d{8}$")},
+        {
+            vol.Optional("start_date"): cv.date,
+            vol.Optional("end_date"): cv.date,
+            vol.Optional("date"): vol.Match(r"^\d{8}$"),  # legacy single-day
+        },
         "async_compile_service",
+        supports_response=SupportsResponse.OPTIONAL,
     )
     platform.async_register_entity_service(
         "export_timelapse",
@@ -80,9 +85,21 @@ class RbxS73TimelapseSwitch(SwitchEntity, RestoreEntity):
         await self._manager.async_stop()
         self.async_write_ha_state()
 
-    async def async_compile_service(self, date: str | None = None) -> None:
-        """Entity service: compile a day's frames into an mp4 now."""
-        await self._manager.async_compile(date)
+    async def async_compile_service(
+        self, start_date=None, end_date=None, date: str | None = None
+    ) -> dict:
+        """Entity service: compile a day or a range of days into an mp4."""
+        sd = start_date.strftime("%Y%m%d") if start_date else date
+        ed = end_date.strftime("%Y%m%d") if end_date else sd
+        path = await self._manager.async_compile(sd, ed)
+        if not path:
+            return {"compiled": False, "reason": "no frames in that range"}
+        rel = path.split("/media/", 1)[-1] if "/media/" in path else path
+        return {
+            "compiled": True,
+            "path": path,
+            "media_source": f"media-source://media_source/local/{rel}",
+        }
 
     async def async_export_service(self, start, end) -> dict:
         """Entity service: export frames in a time range to a temp mp4.
