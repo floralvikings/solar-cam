@@ -165,7 +165,7 @@ class TimelapseManager:
             _LOGGER.warning("time-lapse: no frames to compile for %s", date)
             return None
         out = os.path.join(self.base_dir, f"timelapse-{date}.mp4")
-        await self.hass.async_add_executor_job(os.makedirs, self.base_dir, True)
+        await self.hass.async_add_executor_job(_ensure_dir, self.base_dir)
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-framerate", str(self.fps),
