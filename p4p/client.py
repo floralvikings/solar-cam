@@ -63,6 +63,7 @@ def stream_h264(
     port: int = LAN_SEARCH_PORT,
     warmup_timeout: float = 15.0,
     key_start: bool = True,
+    frame_timeout: float = 20.0,
 ) -> Iterator[bytes]:
     """Yield Annex-B H.264 frames from the camera over the LAN.
 
@@ -115,12 +116,18 @@ def stream_h264(
     kcp = KcpReceiver(conv)
     last_alive = 0.0
     synced = not key_start
+    last_data = time.monotonic()
     try:
         # kick the stream
         for _ in range(3):
             s.sendto(build_alive(conv), (camera_ip, sess_port))
         while True:
             now = time.monotonic()
+            # Watchdog: if the camera stops feeding video (it slept, or another
+            # client took over the single session), stop instead of looping
+            # forever holding the session. Bounds any stuck/orphaned client.
+            if now - last_data > frame_timeout:
+                return
             if now - last_alive > 1.0:
                 s.sendto(build_alive(conv), (camera_ip, sess_port))
                 last_alive = now
@@ -139,6 +146,7 @@ def stream_h264(
             pkt = parse_plain(dec)
             if pkt.msgtype != 0x140A:
                 continue
+            last_data = now
             kcp.input(pkt.body)
             for msg in kcp.messages():
                 frame = extract_h264(msg)

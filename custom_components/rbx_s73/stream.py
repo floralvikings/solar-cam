@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal
 
 from aiohttp import web
 
@@ -47,12 +49,16 @@ class CameraStream:
             cmd = self._cmd_factory()
             _LOGGER.debug("starting mjpeg pipeline")
             self._latest = None
+            # start_new_session=True puts sh + capture.py + ffmpeg in their own
+            # process group so stop() can kill the WHOLE group. Otherwise killing
+            # sh orphans capture.py, which keeps holding the camera's one session.
             self._proc = await asyncio.create_subprocess_exec(
                 "sh",
                 "-c",
                 cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
             )
             self._reader_task = asyncio.create_task(self._read_frames(self._proc))
 
@@ -120,8 +126,8 @@ class CameraStream:
         if task is not None:
             task.cancel()
         if proc is not None and proc.returncode is None:
+            _kill_group(proc)
             try:
-                proc.kill()
                 await proc.wait()
             except ProcessLookupError:
                 pass
@@ -166,7 +172,7 @@ class CameraStream:
         try:
             await response.prepare(request)
             if self._latest is not None:
-                await self._write_frame(response, self._latest)
+                await _write_frame(response, self._latest)
             timeout = _FIRST_FRAME_TIMEOUT
             while True:
                 try:
@@ -176,7 +182,7 @@ class CameraStream:
                 timeout = _STREAM_IDLE_TIMEOUT
                 frame = self._latest
                 if frame is not None:
-                    await self._write_frame(response, frame)
+                    await _write_frame(response, frame)
         except (ConnectionResetError, ConnectionError, asyncio.CancelledError):
             pass
         except Exception as err:  # noqa: BLE001
@@ -185,14 +191,24 @@ class CameraStream:
             self._release()
         return response
 
-    @staticmethod
-    async def _write_frame(response: web.StreamResponse, frame: bytes) -> None:
-        await response.write(
-            b"--"
-            + _BOUNDARY.encode()
-            + b"\r\nContent-Type: image/jpeg\r\nContent-Length: "
-            + str(len(frame)).encode()
-            + b"\r\n\r\n"
-            + frame
-            + b"\r\n"
-        )
+def _kill_group(proc: asyncio.subprocess.Process) -> None:
+    """Kill the whole process group (sh + capture.py + ffmpeg), not just sh."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+
+
+async def _write_frame(response: web.StreamResponse, frame: bytes) -> None:
+    await response.write(
+        b"--"
+        + _BOUNDARY.encode()
+        + b"\r\nContent-Type: image/jpeg\r\nContent-Length: "
+        + str(len(frame)).encode()
+        + b"\r\n\r\n"
+        + frame
+        + b"\r\n"
+    )
