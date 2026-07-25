@@ -23,6 +23,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_CLIENT_IP,
     CONF_HOST,
+    CONF_SESSION_MODE,
     CONF_TL_COMPILE_HOUR,
     CONF_TL_DIR,
     CONF_TL_FPS,
@@ -30,6 +31,7 @@ from .const import (
     CONF_TL_RATE,
     CONF_TL_RATE_UNIT,
     CONF_UID,
+    DEFAULT_SESSION_MODE,
     DEFAULT_TL_COMPILE_HOUR,
     DEFAULT_TL_DIR,
     DEFAULT_TL_FPS,
@@ -37,6 +39,7 @@ from .const import (
     DEFAULT_TL_RATE,
     DEFAULT_TL_RATE_UNIT,
     DOMAIN,
+    SESSION_MODES,
     TL_UNIT_SECONDS,
 )
 from .p4p.lansearch import discover
@@ -117,6 +120,14 @@ class RbxS73OptionsFlow(OptionsFlow):
         opts = self.config_entry.options
         schema = vol.Schema(
             {
+                vol.Optional(
+                    CONF_SESSION_MODE,
+                    default=opts.get(CONF_SESSION_MODE, DEFAULT_SESSION_MODE),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=SESSION_MODES, translation_key="session_mode"
+                    )
+                ),
                 vol.Optional(
                     CONF_TL_RATE, default=opts.get(CONF_TL_RATE, DEFAULT_TL_RATE)
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=600)),

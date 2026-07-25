@@ -21,9 +21,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Time-lapse settings",
-        "description": "Turn capture on/off with the camera's Time-lapse switch. Set how many frames to capture per minute, hour, or day. Each capture briefly wakes the camera (~10s), so keep the rate sane on a solar/battery unit.",
+        "title": "Camera & time-lapse settings",
+        "description": "Session model controls how the single camera connection is kept (a battery vs. reliability trade-off). Time-lapse captures frames on a schedule when its switch is on.",
         "data": {
+          "session_mode": "Session model",
           "timelapse_rate": "Frames to capture",
           "timelapse_rate_unit": "Per",
           "timelapse_fps": "Output video frame rate (fps)",
@@ -40,6 +41,14 @@
         "minute": "minute",
         "hour": "hour",
         "day": "day"
+      }
+    },
+    "session_mode": {
+      "options": {
+        "solar": "Solar: permanent by day, keep-warm at night",
+        "permanent": "Permanent: always connected (most battery use)",
+        "keep_warm": "Keep-warm: hold a few minutes after use",
+        "on_demand": "On-demand: sleep between uses (least battery)"
       }
     }
   },

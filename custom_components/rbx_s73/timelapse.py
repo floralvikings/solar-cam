@@ -141,7 +141,10 @@ class TimelapseManager:
             self._busy = False
 
     async def _capture_frame(self, now) -> None:
-        jpeg = await self.device.stream.snapshot()
+        # max_age=10: reuse the live frame only if the stream is already running
+        # (permanent/keep-warm), otherwise capture fresh — avoids extra sessions
+        # while still getting a current frame each interval.
+        jpeg = await self.device.stream.snapshot(max_age=10.0)
         if not jpeg:
             _LOGGER.debug("time-lapse: no frame from camera")
             return

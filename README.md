@@ -21,10 +21,26 @@ on the same LAN as the camera.
 
 **How it works:** the camera serves only **one AV session at a time**, so the
 integration runs a single shared `capture.py | ffmpeg` pipeline and fans the
-MJPEG frames out to every viewer plus snapshots. The pipeline starts on first
-view and stops a few seconds after the last viewer leaves, so the (solar/battery)
-camera only streams while something is watching. Don't run UBox live view against
+MJPEG frames out to every viewer plus snapshots. Don't run UBox live view against
 the same camera at the same time.
+
+**Session model (important).** This camera *wedges under rapid session
+open/close churn* (it tolerates only a few quick sessions before needing a rest).
+So the integration keeps the session in one of four modes (Configure → **Session
+model**), trading battery for reliability:
+
+- **Solar** (default) — a **permanent** session while the sun is up (solar
+  charging offsets the continuous drain) and **keep-warm** after sunset. Uses
+  HA's `sun.sun`.
+- **Permanent** — always connected, auto-reconnecting on drop. No churn ever,
+  instant view/snapshots; highest battery use.
+- **Keep-warm** — holds the session ~5 min after the last use, then sleeps.
+- **On-demand** — sleeps between uses (lowest battery; ~10s warmup per view).
+
+To avoid waking the camera for HA's dashboard-thumbnail polling, still images are
+served from a short cache. The capture is launched as a process group and killed
+as one (no orphaned `capture.py` holding the session), and the client
+self-terminates if the camera stops feeding video.
 
 Trade-off: MJPEG is heavier on LAN bandwidth and carries no audio. An optional
 H.264-passthrough path (go2rtc/WebRTC) and PTZ controls are planned follow-ups.

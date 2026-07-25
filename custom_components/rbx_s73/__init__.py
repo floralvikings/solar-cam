@@ -24,15 +24,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device.timelapse = TimelapseManager(hass, device, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = device
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await device.async_apply_session_mode()  # permanent/keep-warm/solar/on-demand
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Re-apply time-lapse schedule when options change."""
+    """Re-apply time-lapse schedule + session model when options change."""
     device: RbxS73Device | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if device and device.timelapse:
-        await device.timelapse.async_reschedule()
+    if device:
+        if device.timelapse:
+            await device.timelapse.async_reschedule()
+        await device.async_apply_session_mode()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -32,3 +32,17 @@ DEFAULT_TL_COMPILE_HOUR = 0
 
 # On-demand range exports are temporary: auto-deleted after this many hours.
 EXPORT_TTL_HOURS = 6
+
+# --- Session model (how the single camera session is kept) ---
+CONF_SESSION_MODE = "session_mode"
+SESSION_MODE_SOLAR = "solar"          # permanent while sun is up, keep-warm at night
+SESSION_MODE_PERMANENT = "permanent"  # always on (auto-reconnect)
+SESSION_MODE_KEEP_WARM = "keep_warm"  # hold a few min after use, then sleep
+SESSION_MODE_ON_DEMAND = "on_demand"  # sleep between uses (most battery-friendly)
+SESSION_MODES = [
+    SESSION_MODE_SOLAR,
+    SESSION_MODE_PERMANENT,
+    SESSION_MODE_KEEP_WARM,
+    SESSION_MODE_ON_DEMAND,
+]
+DEFAULT_SESSION_MODE = SESSION_MODE_SOLAR
