@@ -1,0 +1,31 @@
+custom_components/rbx_s73/coordinator.py
+  s_dbf2d9868b1659::t_32bc27d688b4f4 78
+custom_components/rbx_s73/manifest.json
+  s_dbf2d9868b1659::t_7244ebbbdc3026 11
+custom_components/rbx_s73/__init__.py
+  s_dbf2d9868b1659::t_32bc27d688b4f4 18
+docs/protocol-notes.md
+  s_dbf2d9868b1659::t_e563d7d301dc84 236-253
+custom_components/rbx_s73/capture.py
+  s_dbf2d9868b1659::t_32bc27d688b4f4 18,31-33
+custom_components/rbx_s73/p4p/client.py
+  s_dbf2d9868b1659::t_32bc27d688b4f4 17,20
+p4p/client.py
+  s_dbf2d9868b1659::t_32bc27d688b4f4 17,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "208c4f6f600efd1b5cbaf3dc6060c390facee8a9",
+  "prompts": {},
+  "sessions": {
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
