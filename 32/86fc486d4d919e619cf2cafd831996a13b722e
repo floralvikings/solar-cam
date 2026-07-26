@@ -1,0 +1,23 @@
+docs/protocol-notes.md
+  s_dbf2d9868b1659::t_3dc15fa4286847 245-247
+custom_components/rbx_s73/p4p/client.py
+  s_dbf2d9868b1659::t_544fddaf6305a5 270-273
+p4p/client.py
+  s_dbf2d9868b1659::t_ec586f180ca5fa 270-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3286fc486d4d919e619cf2cafd831996a13b722e",
+  "prompts": {},
+  "sessions": {
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
