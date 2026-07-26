@@ -233,19 +233,54 @@ Also queries NTP: `pool.ntp.org`, `0/1/2.pool.ntp.org`,
 `2.north-america.pool.ntp.org`, `hk.ntp.org.cn`, `de.ntp.org.cn`,
 `uk.ntp.pool.org`.
 
-## Command IDs (pan/tilt/wake/live/playback)
+## LOCAL CONTROL — **Solved** (2026-07-25)
 
-Not yet determined — requires single-action captures. Compare with
-`compare_sessions.py`, then diff payloads to locate the opcode.
+Full cloud-free control works over pure LAN. Established by reversing the device
+SDK (`apk/native/libUBICAPIs.so`) and confirmed live against the camera.
 
-| Action | Distinguishing flow | Payload delta / opcode | Confidence |
-|--------|--------------------|------------------------|------------|
-| Wake | | | Unknown |
-| Live view start | | | Unknown |
-| Pan / Tilt | | | Unknown |
-| SD playback | | | Unknown |
+### Session establishment (ioctrl-capable)
+1. LAN-search (0x1301) wakes the camera; it replies with its view-password.
+2. **lanstreamreq (0x1307)** → camera opens a session port and replies **0x1308**.
+   The camera allocates a per-client session slot at a **device-chosen random
+   index**, echoed in the 0x1308 body at **`resp[0x46]`**. It stores our `conv`
+   (request `body[72]`) and our `body[3]` as slot check-fields.
+3. Stream video (KCP over 0x140a; ACK with 0x1409) to bring the session up.
+4. **knock (0x130b)** — auth is a *plaintext* memcmp of UID + view-password +
+   `"admin"` (no crypto). The knock's `pkt[0x3b]` MUST equal the device-assigned
+   index; `pkt[0x40]`=conv; `pkt[0xf]`=`0`. Camera replies **0x130c status=0000**.
+5. **confirm (0x130d)** — `pkt[0x2b]`=index, `pkt[0xf]`=0. Completes the 2-step
+   handshake (marks the slot established). Required before ioctrl is dispatched.
+
+### ioctrl transport (PTZ / commands)
+Commands ride the **avchn's KCP reliable channel** (same conv as video, wrapped
+in obfuscated **0x1409**, client→device PUSH), NOT a raw datagram. One KCP stream
+carries video + control + telemetry, demuxed by a leading type word:
+
+| Frame | Leading word | Layout |
+|-------|-------------|--------|
+| ioctrl request (client→device) | `[0:2]=3` | `[2]=avchannel` `[8:12]=datalen` `[0xc:0x10]=iotype` `[0x10:]=data` |
+| ioctrl response (device→client) | `[0:4]=4` | `[8:12]=datalen` `[0xc:0x10]=iotype` `[0x10:]=data` |
+| telemetry (device→client) | `[0:4]=0x11` | 53-byte periodic status (ts+counter; battery/PIR? — undecoded) |
+
+### Command IDs
+
+| Action | iotype | Payload | Confidence |
+|--------|--------|---------|-----------|
+| Pan/Tilt | 4097 (`PTZ_COMMAND_REQ`) | 8B `SMsgAVIoctrlPtzCmd`; control byte (ENUM_PTZCMD: LEFT=6 RIGHT=3 UP=1 DOWN=2 STOP=0); exact field order tentative | Transport confirmed; camera replies iotype 4096 echoing control. Physical motion pending user confirmation |
+| Device info | 816 (`DEVINFO_REQ`) | 4 zero bytes | Sent; no reply on this camera (may be unsupported) |
+| Light (white/flood) | `SET_LIGHT_TABLE` 4676 is a *schedule table*, not on/off | — | Unknown; needs an app-PTZ/light capture |
+| SD playback | FILE_LIST 4864 / FILE_DOWNLOAD 4866 | — | Untested |
+
+### Implementation
+- `p4p.session.build_knock` / `build_knock_confirm`, `p4p.kcp.KcpSender` /
+  `build_ioctrl_frame`, and `p4p.client.LanControlSession` (video + control on one
+  session, driven by a Unix control socket).
+- HA integration: PTZ buttons → `coordinator.async_send_control` → the control
+  socket into the live `capture.py` session.
 
 ## Open questions
-- Is the obfuscation mask static across sessions/devices? (needs 2nd capture)
-- Does the phone ever talk **directly** to the camera, or always via relay?
-- Can a LAN peer initiate a session without the cloud?
+- Does PTZ physically move the motor with the current struct encoding, or is the
+  field order / a motor-wake state off? (resolve with an app-PTZ LAN capture)
+- Exact `SMsgAVIoctrlPtzCmd` field order (aux/channel/control/limit/point/speed).
+- Decode the 53-byte `0x11` telemetry frames (battery %, PIR, status).
+- Is the obfuscation mask static across sessions/devices?

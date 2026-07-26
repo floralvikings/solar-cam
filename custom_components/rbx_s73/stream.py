@@ -166,6 +166,14 @@ class CameraStream:
         if self._refs == 0 and not self._permanent:
             self._schedule_stop()
 
+    async def acquire(self) -> None:
+        """Public: hold the session up (e.g. for PTZ). Pair with release()."""
+        await self._acquire()
+
+    def release(self) -> None:
+        """Public: drop a hold taken with acquire()."""
+        self._release()
+
     # ---- session model (permanent / keep-warm) -----------------------
     def set_idle_hold(self, seconds: float) -> None:
         """How long to keep the session up after the last consumer leaves."""
