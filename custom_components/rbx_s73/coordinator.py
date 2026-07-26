@@ -27,6 +27,8 @@ from .const import (
     CONF_SESSION_MODE,
     CONF_UID,
     DEFAULT_SESSION_MODE,
+    PTZ_NUDGE_SECONDS,
+    PTZ_REPEAT_INTERVAL,
     SESSION_MODE_KEEP_WARM,
     SESSION_MODE_ON_DEMAND,
     SESSION_MODE_PERMANENT,
@@ -88,32 +90,53 @@ class RbxS73Device:
         return f"{capture} | {_FFMPEG}"
 
     # ---- PTZ / ioctrl control ----------------------------------------
-    async def async_send_control(self, command: str) -> None:
-        """Send a control command (e.g. ``ptz left``) to the live session.
+    async def _ensure_ready(self) -> bool:
+        """Bring the single camera session up and wait until it's ioctrl-ready.
 
-        Ensures the single camera session is up (so ``capture.py`` is running and
-        has bound the control socket + completed the ioctrl handshake), then
-        writes the command. Holds the session briefly so rapid presses reuse it.
+        Acquiring starts ``capture.py`` (if not already streaming); it binds the
+        control socket only AFTER the video sync + knock/confirm handshake, so the
+        socket's existence == readiness. Held once; a debounced release balances it.
         """
-        # Acquire the session once; a single debounced release balances it, so
-        # repeated commands (a nudge is "dir" + "stop") don't leak session refs.
         if not self._control_held:
             self._control_held = True
             await self.stream.acquire()
-        # Wait for capture.py to bind the socket, which it does only AFTER the
-        # session is ioctrl-ready (video sync + knock/confirm) — so this also
-        # gates on readiness. Cold start = cooldown + wake + keyframe + handshake.
-        ready = False
-        for _ in range(100):  # up to ~30s
+        for _ in range(100):  # up to ~30s (cold: cooldown + wake + keyframe + knock)
             if os.path.exists(self.control_sock):
-                ready = True
-                break
+                return True
             await asyncio.sleep(0.3)
+        return False
+
+    async def async_ptz(self, direction: str) -> None:
+        """Nudge pan/tilt: repeat the direction (the motor steps per command) for
+        a short window, then stop. Repeats accumulate a visible move."""
+        ready = await self._ensure_ready()
         try:
             if not ready:
                 _LOGGER.warning(
                     "PTZ '%s' dropped: camera session not ready (no control "
-                    "socket at %s)", command, self.control_sock
+                    "socket at %s)", direction, self.control_sock
+                )
+                return
+            loop = asyncio.get_running_loop()
+            end = loop.time() + PTZ_NUDGE_SECONDS
+            n = 0
+            while loop.time() < end:
+                await self.hass.async_add_executor_job(self._sendto, f"ptz {direction}")
+                n += 1
+                await asyncio.sleep(PTZ_REPEAT_INTERVAL)
+            await self.hass.async_add_executor_job(self._sendto, "ptz stop")
+            _LOGGER.debug("PTZ %s: sent %d step commands then stop", direction, n)
+        finally:
+            self._schedule_control_release()
+
+    async def async_send_control(self, command: str) -> None:
+        """Send a single control command (e.g. ``ptz stop``) to the live session."""
+        ready = await self._ensure_ready()
+        try:
+            if not ready:
+                _LOGGER.warning(
+                    "control '%s' dropped: camera session not ready (no socket "
+                    "at %s)", command, self.control_sock
                 )
                 return
             await self.hass.async_add_executor_job(self._sendto, command)

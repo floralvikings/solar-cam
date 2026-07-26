@@ -8,15 +8,13 @@ halts immediately.
 
 from __future__ import annotations
 
-import asyncio
-
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, PTZ_DIRECTIONS, PTZ_NUDGE_SECONDS
+from .const import DOMAIN, PTZ_DIRECTIONS
 from .coordinator import RbxS73Device
 
 
@@ -59,9 +57,7 @@ class RbxS73PtzButton(_PtzBase):
         self._attr_unique_id = f"{device.uid}_ptz_{direction}"
 
     async def async_press(self) -> None:
-        await self._device.async_send_control(f"ptz {self._direction}")
-        await asyncio.sleep(PTZ_NUDGE_SECONDS)
-        await self._device.async_send_control("ptz stop")
+        await self._device.async_ptz(self._direction)
 
 
 class RbxS73PtzStopButton(_PtzBase):

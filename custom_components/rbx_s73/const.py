@@ -20,8 +20,13 @@ PTZ_DIRECTIONS = {
     "up": "mdi:arrow-up-bold",
     "down": "mdi:arrow-down-bold",
 }
-# How long to hold a direction before auto-stopping (a press = a nudge).
-PTZ_NUDGE_SECONDS = 1.2
+# A press = a nudge: repeat the direction command every PTZ_REPEAT_INTERVAL for
+# PTZ_NUDGE_SECONDS, then stop. The motor moves a small step/burst per command
+# (that's how repeated commands walked it to its limit in testing), so a single
+# command is imperceptible — repeating accumulates a visible move. Press again to
+# move further; the whole PTZ range was ~10 commands.
+PTZ_NUDGE_SECONDS = 1.0
+PTZ_REPEAT_INTERVAL = 0.3
 
 
 def control_sock_path(uid: str) -> str:
