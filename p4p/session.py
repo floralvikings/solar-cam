@@ -139,46 +139,6 @@ def parse_lanstreamrsp(decoded: bytes) -> LanStreamResponse:
     return LanStreamResponse(camera_ip, session_port, session_id, uid, b)
 
 
-# --- Authenticated control handshake (knock 0x130b + confirm 0x130d) ----------
-# After lanstreamreq gives video, this 2-step handshake upgrades the session to
-# ioctrl-capable (PTZ/light/etc). Device logic (libUBICAPIs.so):
-#   handle_lanstreamreq allocs a session at a device-chosen index, echoed in the
-#   0x1308 response at body[0x36] (== raw resp[0x46]); it stores our conv at the
-#   slot and our request body[3] as a check byte.
-#   handle_knock(0x130b): chanidx=pkt[0x3b]; requires slot[0xc]==conv and
-#   slot[0x17]==pkt[0xf]; on pass sets slot[0x19]=1.
-#   handle_knock_ack(0x130d): chanidx=pkt[0x2b]; same [0x17] check; sets
-#   slot[0x19]=0 (established). Both need chanidx = the device-assigned index and
-#   pkt[0xf] = the lanstreamreq body[3] (0 for build_lanstreamreq above).
-# Auth is a plaintext memcmp of UID + view-password + "admin" (no crypto).
-_KNOCK_HDR = bytes.fromhex("07181000440000000b13210000000004")    # 0x130b
-_CONFIRM_HDR = bytes.fromhex("07181000240000000d13210000000004")  # 0x130d
-
-
-def _uid20(uid: str) -> bytes:
-    return uid.strip().upper().encode("ascii").ljust(20, b"\x00")[:20]
-
-
-def build_knock(uid: str, view_pw: bytes, rid: bytes, conv: int, *,
-                chanidx: int, hdr0f: int = 0x00) -> bytes:
-    """0x130b knock. ``chanidx`` = device-assigned session index (0x1308 body[0x36]);
-    ``hdr0f`` must equal the lanstreamreq body[3] (0). ``conv`` = the video conv."""
-    conv_le = struct.pack("<I", conv & 0xFFFFFFFF)
-    body = (_uid20(uid) + view_pw[:16].ljust(16, b"\x00")
-            + bytes([0, 0, 0, 0, 0, 0, 0x0b, chanidx & 0xFF]) + rid[:4] + conv_le
-            + b"admin" + bytes(11))
-    hdr = bytearray(_KNOCK_HDR); hdr[15] = hdr0f & 0xFF
-    return bytes(hdr) + body
-
-
-def build_knock_confirm(rid: bytes, conv: int, *, chanidx: int, hdr0f: int = 0x00) -> bytes:
-    """0x130d knock-ack completing the handshake (no secrets)."""
-    conv_le = struct.pack("<I", conv & 0xFFFFFFFF)
-    hdr = bytearray(_CONFIRM_HDR); hdr[15] = hdr0f & 0xFF
-    body = bytearray(26) + bytes([0x0b, chanidx & 0xFF]) + rid[:4] + conv_le
-    return bytes(hdr) + bytes(body)
-
-
 def make_random_id(seed_bytes: bytes) -> int:
     """32-bit session correlation id (SDK: p4p_client_randomID; also the KCP conv).
 

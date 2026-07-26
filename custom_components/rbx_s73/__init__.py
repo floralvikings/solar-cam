@@ -15,7 +15,7 @@ from .const import DOMAIN
 from .coordinator import RbxS73Device
 from .timelapse import TimelapseManager
 
-PLATFORMS: list[Platform] = [Platform.CAMERA, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.CAMERA, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

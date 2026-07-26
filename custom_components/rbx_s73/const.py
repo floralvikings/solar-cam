@@ -11,30 +11,6 @@ CONF_CLIENT_IP = "client_ip"  # this HA host's LAN IP (video destination)
 # The camera only serves one AV session at a time; the integration owns it.
 LAN_SEARCH_PORT = 32762
 
-# --- PTZ controls (ioctrl over the live session) ---
-# The camera runs one session, so PTZ rides the active video session via a Unix
-# control socket into the capture subprocess. Directions map to ENUM_PTZCMD.
-PTZ_DIRECTIONS = {
-    "left": "mdi:arrow-left-bold",
-    "right": "mdi:arrow-right-bold",
-    "up": "mdi:arrow-up-bold",
-    "down": "mdi:arrow-down-bold",
-}
-# A press = a nudge: repeat the direction command every PTZ_REPEAT_INTERVAL for
-# PTZ_NUDGE_SECONDS, then stop. The motor moves a small step/burst per command
-# (that's how repeated commands walked it to its limit in testing), so a single
-# command is imperceptible — repeating accumulates a visible move. Press again to
-# move further; the whole PTZ range was ~10 commands.
-PTZ_NUDGE_SECONDS = 1.0
-PTZ_REPEAT_INTERVAL = 0.3
-
-
-def control_sock_path(uid: str) -> str:
-    """Per-camera Unix control socket (capture.py binds it, HA writes to it)."""
-    import tempfile
-
-    return f"{tempfile.gettempdir()}/rbx_s73_{uid}.sock"
-
 # --- Time-lapse options (config entry options) ---
 CONF_TL_RATE = "timelapse_rate"              # how many frames to capture per unit
 CONF_TL_RATE_UNIT = "timelapse_rate_unit"    # "minute" | "hour" | "day"

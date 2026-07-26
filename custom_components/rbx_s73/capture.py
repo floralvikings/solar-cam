@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from p4p.client import LanControlSession, stream_h264  # noqa: E402
+from p4p.client import stream_h264  # noqa: E402
 
 
 def main() -> int:
@@ -24,24 +24,13 @@ def main() -> int:
     ap.add_argument("--camera-ip", required=True)
     ap.add_argument("--client-ip", required=True)
     ap.add_argument("--broadcast", default="255.255.255.255")
-    ap.add_argument("--control-sock", default=None,
-                    help="Unix datagram socket to accept PTZ/ioctrl commands on")
     ap.add_argument("-o", "--output", default="-")
     args = ap.parse_args()
     out = sys.stdout.buffer if args.output == "-" else open(args.output, "wb")
-    # With a control socket, use the control-capable session (video + PTZ);
-    # without it, the plain video-only generator (unchanged behavior).
-    if args.control_sock:
-        frames = LanControlSession(
-            args.uid, args.camera_ip, args.client_ip,
-            broadcast=args.broadcast, control_sock_path=args.control_sock,
-        ).frames()
-    else:
-        frames = stream_h264(
-            args.uid, args.camera_ip, args.client_ip, broadcast=args.broadcast
-        )
     try:
-        for frame in frames:
+        for frame in stream_h264(
+            args.uid, args.camera_ip, args.client_ip, broadcast=args.broadcast
+        ):
             out.write(frame)
             out.flush()
     except (BrokenPipeError, KeyboardInterrupt):

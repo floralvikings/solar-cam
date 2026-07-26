@@ -233,10 +233,24 @@ Also queries NTP: `pool.ntp.org`, `0/1/2.pool.ntp.org`,
 `2.north-america.pool.ntp.org`, `hk.ntp.org.cn`, `de.ntp.org.cn`,
 `uk.ntp.pool.org`.
 
-## LOCAL CONTROL — **Solved** (2026-07-25)
+## LOCAL CONTROL — protocol reversed, but PTZ is **cloud-gated (dead end)**
 
-Full cloud-free control works over pure LAN. Established by reversing the device
-SDK (`apk/native/libUBICAPIs.so`) and confirmed live against the camera.
+> **OUTCOME (2026-07-25):** the local session + ioctrl **transport** below all
+> work — the authenticated handshake passes, commands are KCP-acked, and the
+> camera even echoes the PTZ control byte. **But local ioctrl does NOT drive the
+> motor.** Proven objectively by decoding before/after video keyframes and
+> PIL-diffing across 5 command encodings (both opcode sets, 3 control-byte
+> positions, max speed): every result sat at the static noise floor (MAD ~3.5),
+> i.e. zero movement. This firmware routes pan/tilt/light through the **cloud
+> WebSocket `ws-us.ubianet.com`**; the local ioctrl receiver accepts but isn't
+> wired to the motor (confirmed independently by the WireGuard capture — see
+> `capture-procedure.md` Method W, which found the app sends PTZ over the cloud,
+> zero local ioctrl). The reversed protocol below is accurate and real; it just
+> can't move the camera. **Path to real local PTZ + RTSP/ONVIF: UART →
+> thingino/OpenIPC on the Ingenic T31.**
+
+The reverse-engineering below (from `apk/native/libUBICAPIs.so`, confirmed live)
+documents the full local session/ioctrl protocol for the record.
 
 ### Session establishment (ioctrl-capable)
 1. LAN-search (0x1301) wakes the camera; it replies with its view-password.
