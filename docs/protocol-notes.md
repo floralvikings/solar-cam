@@ -242,7 +242,9 @@ SDK (`apk/native/libUBICAPIs.so`) and confirmed live against the camera.
 1. LAN-search (0x1301) wakes the camera; it replies with its view-password.
 2. **lanstreamreq (0x1307)** → camera opens a session port and replies **0x1308**.
    The camera allocates a per-client session slot at a **device-chosen random
-   index**, echoed in the 0x1308 body at **`resp[0x46]`**. It stores our `conv`
+   index**, echoed in the 0x1308 response after a `04 01 00 00 00` marker at
+   `resp[0x42]`, so the index byte is **`resp[0x47]`** (it is 0 in the common
+   case, which hid an earlier off-by-one vs `resp[0x46]`). It stores our `conv`
    (request `body[72]`) and our `body[3]` as slot check-fields.
 3. Stream video (KCP over 0x140a; ACK with 0x1409) to bring the session up.
 4. **knock (0x130b)** — auth is a *plaintext* memcmp of UID + view-password +

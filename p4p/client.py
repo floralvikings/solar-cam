@@ -267,7 +267,10 @@ class LanControlSession:
                 dec = decode(data)
                 if dec[:4] == MAGIC and struct.unpack_from("<H", dec, 8)[0] == 0x1308:
                     sess_port = parse_lanstreamrsp(dec).session_port
-                    index = dec[0x46]
+                    # device-assigned session index: marker "04 01 00 00 00 <idx>"
+                    # at resp[0x42]; the index byte is resp[0x47]. (It's 0 in the
+                    # common case, which hid this off-by-one from resp[0x46].)
+                    index = dec[0x47]
             except Exception:
                 pass
         if sess_port is None:
