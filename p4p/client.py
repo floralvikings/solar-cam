@@ -274,7 +274,10 @@ class LanControlSession:
             s.close()
             raise RuntimeError("no 0x1308 (auth failed? camera busy? password wrong?)")
 
-        cs = self._open_control()
+        # The control socket is bound only AFTER the handshake completes (below),
+        # so the HA side's "socket exists" check means "ioctrl is ready" — commands
+        # then fire live instead of queueing (which would batch a nudge to ~0ms).
+        cs = None
         kcp = KcpReceiver(conv)
         snd = KcpSender(conv)
         avidx = 0
@@ -282,7 +285,6 @@ class LanControlSession:
         last_data = time.monotonic()
         synced = False
         handshaked = False
-        pending: list[tuple[int, bytes]] = []  # commands queued before ioctrl-ready
         try:
             for _ in range(3):
                 s.sendto(build_alive(conv), (self.camera_ip, sess_port))
@@ -295,7 +297,7 @@ class LanControlSession:
                     for seg in snd.retransmit_segments():
                         s.sendto(build(0x1409, seg, aux=0x21), (self.camera_ip, sess_port))
                     last_alive = now
-                # drain control commands
+                # drain control commands (socket only exists once ioctrl-ready)
                 if cs is not None:
                     while True:
                         try:
@@ -303,12 +305,8 @@ class LanControlSession:
                         except (BlockingIOError, OSError):
                             break
                         cmd = parse_control_command(raw.decode("utf-8", "ignore"))
-                        if cmd is None:
-                            continue
-                        if self.ioctrl_ready:
+                        if cmd is not None:
                             self._send_ioctrl(s, snd, kcp, sess_port, avidx, *cmd)
-                        else:
-                            pending.append(cmd)
                 try:
                     data, _ = s.recvfrom(65535)
                 except socket.timeout:
@@ -338,14 +336,13 @@ class LanControlSession:
                             continue
                         synced = True
                     yield frame
-                # after first keyframe, complete the control handshake once
+                # after first keyframe, complete the control handshake once, then
+                # expose the control socket (so HA only sends once ioctrl works)
                 if synced and not handshaked and index is not None:
                     self._handshake(s, sess_port, conv, pw, index)
                     handshaked = True
                     self.ioctrl_ready = True
-                    for cmd in pending:
-                        self._send_ioctrl(s, snd, kcp, sess_port, avidx, *cmd)
-                    pending.clear()
+                    cs = self._open_control()
                 acks = kcp.ack_segments()
                 for i in range(0, len(acks), 8):
                     s.sendto(build(0x1409, b"".join(acks[i:i + 8]), aux=0x21),

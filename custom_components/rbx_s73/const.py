@@ -21,7 +21,7 @@ PTZ_DIRECTIONS = {
     "down": "mdi:arrow-down-bold",
 }
 # How long to hold a direction before auto-stopping (a press = a nudge).
-PTZ_NUDGE_SECONDS = 0.6
+PTZ_NUDGE_SECONDS = 1.2
 
 
 def control_sock_path(uid: str) -> str:

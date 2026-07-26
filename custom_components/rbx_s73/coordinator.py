@@ -100,12 +100,22 @@ class RbxS73Device:
         if not self._control_held:
             self._control_held = True
             await self.stream.acquire()
-        # Wait (briefly) for capture.py to bind the socket + finish the handshake.
-        for _ in range(60):  # up to ~18s (camera wake + first keyframe + knock)
+        # Wait for capture.py to bind the socket, which it does only AFTER the
+        # session is ioctrl-ready (video sync + knock/confirm) — so this also
+        # gates on readiness. Cold start = cooldown + wake + keyframe + handshake.
+        ready = False
+        for _ in range(100):  # up to ~30s
             if os.path.exists(self.control_sock):
+                ready = True
                 break
             await asyncio.sleep(0.3)
         try:
+            if not ready:
+                _LOGGER.warning(
+                    "PTZ '%s' dropped: camera session not ready (no control "
+                    "socket at %s)", command, self.control_sock
+                )
+                return
             await self.hass.async_add_executor_job(self._sendto, command)
         finally:
             self._schedule_control_release()
