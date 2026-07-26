@@ -1,0 +1,51 @@
+custom_components/rbx_s73/coordinator.py
+  s_dbf2d9868b1659::t_69780f1d449fbc 21-23,34
+  s_dbf2d9868b1659::t_f5bba412f85776 192-195
+  s_dbf2d9868b1659::t_620e47ee6d20ca 71,74-75,85-86,90-97,103-135
+  s_dbf2d9868b1659::t_5b92dd108cbe9b 98-102
+  s_dbf2d9868b1659::t_bdb47f5b21f8ba 136
+custom_components/rbx_s73/capture.py
+  s_dbf2d9868b1659::t_826a6011585342 18,27-28,32-40,42-44
+p4p/kcp.py
+  s_dbf2d9868b1659::t_794e111fa10b48 81-145
+custom_components/rbx_s73/p4p/session.py
+  s_dbf2d9868b1659::t_c8465b04dc0ec7 142-181
+p4p/client.py
+  s_dbf2d9868b1659::t_a00775b7f16ce1 196-378
+  s_dbf2d9868b1659::t_0ecd5f458cad46 17,20,23-24,33-58
+  s_dbf2d9868b1659::t_914f6913606f5a 59
+custom_components/rbx_s73/const.py
+  s_dbf2d9868b1659::t_c9f0188a29e559 14-32
+p4p/session.py
+  s_dbf2d9868b1659::t_2f6f5fa4b15627 142-181
+custom_components/rbx_s73/stream.py
+  s_dbf2d9868b1659::t_9ed7f4bd9ab58b 169-176
+custom_components/rbx_s73/button.py
+  s_dbf2d9868b1659::t_35b9e673d1c07e 1-77
+custom_components/rbx_s73/p4p/kcp.py
+  s_dbf2d9868b1659::t_c8465b04dc0ec7 81-145
+custom_components/rbx_s73/__init__.py
+  s_dbf2d9868b1659::t_ab06a1b17ffa43 18
+custom_components/rbx_s73/manifest.json
+  s_dbf2d9868b1659::t_1429fd17b060cb 11
+custom_components/rbx_s73/p4p/client.py
+  s_dbf2d9868b1659::t_c8465b04dc0ec7 17,20,23-24,33-59,196-378
+docs/protocol-notes.md
+  s_dbf2d9868b1659::t_3e86b3a83f8d9b 236-279,282-286
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3ddb21c9806a81d98cf76c1c0b12ee162fb9282b",
+  "prompts": {},
+  "sessions": {
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
