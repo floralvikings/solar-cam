@@ -96,3 +96,64 @@ requires replacing the firmware (thingino/OpenIPC), not enabling a hidden daemon
 flashrom -p serprog:dev=PORT,spispeed=1M -w captures/flash_stock_verified.bin
 ```
 Wiring and the in-circuit-vs-chip-off findings: `hardware-notes.md`.
+
+---
+
+# Live UART boot log (primary camera, 2026-08-02)
+
+3-pin header soldered to the labeled GND/TXD/RXD through-holes; CP2102 at
+**115200 8N1** (GND, camera TXD→adapter RX, camera RXD→adapter TX, **no VCC**).
+Result: clean log, 99% printable. `tools/uart_console.py` (capture/break/cmd).
+
+## Key findings
+- **No U-Boot console.** The SPL is an Ingenic **fast-boot** loader
+  (`spl_time:202ms`, `kernel_len:4722604 rootfs_len:7542272`) that jumps straight
+  to the kernel. No banner, no `Hit any key`, and `break` mode (keystrokes spammed
+  from before power-on) never caught a prompt. U-Boot exists in flash but is not
+  executed on this path.
+- **No shell on the console.** Enter yields no prompt; output-only.
+  ⇒ Neither U-Boot (`loady`/`sf write`) nor userspace flashing is available.
+  **Flashing/backup must be done at the chip** (clip/programmer).
+- **Wi-Fi module is a HiSilicon `hi3861`**, NOT the ESP32 (`get_wifi3861_status`,
+  `ubia_sta_connect_wifi … send ssid key to hi3861`). The `esp32_sdio.ko` present
+  in the `system` partition is an unused driver.
+- Watchdog: `t31_wdt`, timeout 30 s (T23/T31 share drivers).
+- App version `Ver:1.0.21.10`; SPL banner `Ver:241028-T23ZN-SINGLE-…`.
+- Runtime config matches the `tag` ENVI block exactly (2304×1296, bitrates,
+  battery_cam, ModelNum 2455 …).
+- Camera reboots itself periodically (battery/power-management driven).
+
+## Sensor fingerprint (name NOT stored in plaintext anywhere)
+The SPL reads a 256-byte **`SENS`** descriptor — two copies in the `tag`
+partition at **0x41000** and **0x48000**. All fields verified against the SPL's
+own printout:
+
+| Field | Value |
+|---|---|
+| magic | `SENS` (`0x534e4553`) |
+| crc | `0x8a2e3135` |
+| mclk | `0x016e3600` = 24 MHz |
+| pin_mask | `0x000343ff` |
+| **i2c_addr** | **0x35** |
+| i2c_index | 0 |
+| reg_addr_size / value_size | 2 / 1 |
+| init regs (16-bit addr) | `0x3029=00, 0x302a=00, 0x3401=01, 0x3440=03, 0x3442=00, 0x3806=01, 0x3158=01` |
+
+The descriptor is **name-less** — the model name lives only in the compressed
+kernel driver. Resolution 2304×1296 + T23 points at the usual 3 MP SmartSens-class
+part, but this is **not confirmed**. Resolve it later by letting thingino probe,
+or by reading the sensor chip ID over I²C once a root shell exists.
+
+## Kernel decompression — partial
+The uImage payload is a **vendor-modified lz4**. Header decoded and validated:
+`u32 block_size=0x10000`, `u32 total=4722604` (exactly matching the boot log's
+`kernel_len`). The payload itself does not parse as standard lz4 block or frame
+format (tried raw/framed at several offsets, and a per-block length-prefix
+scheme). Not pursued further — not required for the thingino path.
+
+## Consequence for installing custom firmware
+No secure boot (U-Boot only does a uImage CRC32), so custom firmware **will**
+boot. But with no console input and no shell, the only write path is
+**chip-off → clip → flashrom → resolder**. That same operation is also the only
+way to back up the primary's unique per-device data (UID/MAC/Wi-Fi/AE calibration),
+so a single chip-off covers backup + flash.
