@@ -78,3 +78,68 @@ class KcpReceiver:
     @property
     def has_pending_acks(self) -> bool:
         return bool(self._acks)
+
+
+class KcpSender:
+    """Minimal client->device KCP PUSH sender (no congestion control).
+
+    ioctrl commands ride the avchn's KCP reliable channel (same conv as the video
+    stream, opposite direction). ``p4p_client_send_ioctrl`` builds a type-3 frame
+    and hands it to ``p4p_kcp_send``; on the wire each segment is a 24-byte ikcp
+    header + payload, wrapped in an obfuscated 0x1409 P4P packet (same wrapper as
+    our video ACKs). Messages are tiny (<< MSS) so we never fragment (frg=0).
+    """
+
+    def __init__(self, conv: int, wnd: int = IKCP_RCV_WND):
+        self.conv = conv & 0xFFFFFFFF
+        self.wnd = wnd
+        self.snd_nxt = 0
+        self.unacked: dict[int, bytes] = {}  # sn -> segment bytes
+
+    def push(self, payload: bytes, *, una: int = 0, ts: int = 0) -> bytes:
+        """Allocate the next sn and return a single-fragment PUSH segment.
+
+        ``una`` cumulatively acks the peer's send stream (pass the receiver's
+        ``rcv_nxt``). The segment is remembered for retransmit until acked."""
+        sn = self.snd_nxt
+        seg = _HDR.pack(self.conv, IKCP_CMD_PUSH, 0, self.wnd, ts, sn, una, len(payload)) + payload
+        self.snd_nxt += 1
+        self.unacked[sn] = seg
+        return seg
+
+    def note_acks(self, udp_payload: bytes) -> list[int]:
+        """Scan a deobfuscated 0x140a/0x1409 body for KCP ACKs of our pushes.
+
+        Removes acked segments from the retransmit set; returns the acked sns.
+        Honors both explicit ACK segments (cmd 82, sn) and the cumulative ``una``
+        carried on any segment."""
+        data = udp_payload
+        off = 0
+        n = len(data)
+        acked: list[int] = []
+        while n - off >= _HDR.size:
+            conv, cmd, frg, wnd, ts, sn, una, ln = _HDR.unpack_from(data, off)
+            off += _HDR.size + ln
+            if conv != self.conv:
+                continue
+            for s in [k for k in self.unacked if k < una]:
+                del self.unacked[s]; acked.append(s)
+            if cmd == IKCP_CMD_ACK and sn in self.unacked:
+                del self.unacked[sn]; acked.append(sn)
+        return acked
+
+    def retransmit_segments(self) -> list[bytes]:
+        """All still-unacked segments (caller decides cadence)."""
+        return list(self.unacked.values())
+
+
+def build_ioctrl_frame(avchannel: int, iotype: int, data: bytes) -> bytes:
+    """The type-3 ioctrl frame p4p_client_send_ioctrl feeds to KCP:
+    [0:2]=3  [2]=avchannel  [3:8]=0  [8:12]=datalen  [0xc:0x10]=iotype  [0x10:]=data."""
+    f = bytearray(0x10 + len(data))
+    struct.pack_into("<H", f, 0, 3)
+    f[2] = avchannel & 0xFF
+    struct.pack_into("<I", f, 8, len(data))
+    struct.pack_into("<I", f, 0xC, iotype & 0xFFFFFFFF)
+    f[0x10:] = data
+    return bytes(f)

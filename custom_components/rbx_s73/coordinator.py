@@ -18,16 +18,22 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_sunrise, async_track_sunset
 
+import asyncio
+import socket
+
 from .const import (
     CONF_CLIENT_IP,
     CONF_HOST,
     CONF_SESSION_MODE,
     CONF_UID,
     DEFAULT_SESSION_MODE,
+    PTZ_NUDGE_SECONDS,
+    PTZ_REPEAT_INTERVAL,
     SESSION_MODE_KEEP_WARM,
     SESSION_MODE_ON_DEMAND,
     SESSION_MODE_PERMANENT,
     SESSION_MODE_SOLAR,
+    control_sock_path,
 )
 from .stream import CameraStream
 
@@ -64,8 +70,11 @@ class RbxS73Device:
         self.entry_id: str = entry.entry_id
         self.entry = entry
         self.stream = CameraStream(self._mjpeg_cmd)
+        self.control_sock = control_sock_path(self.uid)
         self.timelapse = None  # set by __init__.async_setup_entry
         self._unsub_sun: list = []
+        self._control_release: asyncio.TimerHandle | None = None
+        self._control_held = False
 
     def _mjpeg_cmd(self) -> str:
         py = sys.executable or "python3"
@@ -75,9 +84,88 @@ class RbxS73Device:
             f"--uid {shlex.quote(self.uid)} "
             f"--camera-ip {shlex.quote(self.host)} "
             f"--client-ip {shlex.quote(self.client_ip)} "
-            f"--broadcast {shlex.quote(broadcast)} -o -"
+            f"--broadcast {shlex.quote(broadcast)} "
+            f"--control-sock {shlex.quote(self.control_sock)} -o -"
         )
         return f"{capture} | {_FFMPEG}"
+
+    # ---- PTZ / ioctrl control ----------------------------------------
+    async def _ensure_ready(self) -> bool:
+        """Bring the single camera session up and wait until it's ioctrl-ready.
+
+        Acquiring starts ``capture.py`` (if not already streaming); it binds the
+        control socket only AFTER the video sync + knock/confirm handshake, so the
+        socket's existence == readiness. Held once; a debounced release balances it.
+        """
+        if not self._control_held:
+            self._control_held = True
+            await self.stream.acquire()
+        for _ in range(100):  # up to ~30s (cold: cooldown + wake + keyframe + knock)
+            if os.path.exists(self.control_sock):
+                return True
+            await asyncio.sleep(0.3)
+        return False
+
+    async def async_ptz(self, direction: str) -> None:
+        """Nudge pan/tilt: repeat the direction (the motor steps per command) for
+        a short window, then stop. Repeats accumulate a visible move."""
+        ready = await self._ensure_ready()
+        try:
+            if not ready:
+                _LOGGER.warning(
+                    "PTZ '%s' dropped: camera session not ready (no control "
+                    "socket at %s)", direction, self.control_sock
+                )
+                return
+            loop = asyncio.get_running_loop()
+            end = loop.time() + PTZ_NUDGE_SECONDS
+            n = 0
+            while loop.time() < end:
+                await self.hass.async_add_executor_job(self._sendto, f"ptz {direction}")
+                n += 1
+                await asyncio.sleep(PTZ_REPEAT_INTERVAL)
+            await self.hass.async_add_executor_job(self._sendto, "ptz stop")
+            _LOGGER.debug("PTZ %s: sent %d step commands then stop", direction, n)
+        finally:
+            self._schedule_control_release()
+
+    async def async_send_control(self, command: str) -> None:
+        """Send a single control command (e.g. ``ptz stop``) to the live session."""
+        ready = await self._ensure_ready()
+        try:
+            if not ready:
+                _LOGGER.warning(
+                    "control '%s' dropped: camera session not ready (no socket "
+                    "at %s)", command, self.control_sock
+                )
+                return
+            await self.hass.async_add_executor_job(self._sendto, command)
+        finally:
+            self._schedule_control_release()
+
+    def _sendto(self, command: str) -> None:
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            try:
+                s.sendto(command.encode("utf-8"), self.control_sock)
+            finally:
+                s.close()
+        except OSError as err:
+            _LOGGER.warning("PTZ control send failed: %s", err)
+
+    def _schedule_control_release(self) -> None:
+        loop = asyncio.get_running_loop()
+        if self._control_release is not None:
+            self._control_release.cancel()
+        # keep the session ~12s after the last command for successive nudges
+        self._control_release = loop.call_later(
+            12.0, lambda: loop.create_task(self._release_control())
+        )
+
+    async def _release_control(self) -> None:
+        if self._control_held:
+            self._control_held = False
+            self.stream.release()
 
     # ---- session model ------------------------------------------------
     def _session_mode(self) -> str:
@@ -134,5 +222,9 @@ class RbxS73Device:
 
     async def async_stop(self) -> None:
         await self._clear_sun_tracking()
+        if self._control_release is not None:
+            self._control_release.cancel()
+            self._control_release = None
+        self._control_held = False
         await self.stream.set_permanent(False)
         await self.stream.stop()
