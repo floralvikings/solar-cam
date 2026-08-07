@@ -151,9 +151,73 @@ The uImage payload is a **vendor-modified lz4**. Header decoded and validated:
 format (tried raw/framed at several offsets, and a per-block length-prefix
 scheme). Not pursued further — not required for the thingino path.
 
+## OTA / network flash path — **the camera fetches from a URL we choose**
+
+**Confirmed 2026-08-07, live, twice.** `tools/fwtest.py` sent ioType **4631**
+(`IOTYPE_USER_IPCAM_FIRMWARE_UPDATE_REQ`) over a relay-path session
+(`tools/p4p_relay.py`, 0x1105 — see `protocol-notes.md`) with `file_type=1` and
+a URL pointing at this host. The camera answered **4632** and then connected to
+our listener:
+
+```
+!!! TCP connect from <camera>:45864 -> answering 404
+    GET http://<us>/firmware/ HTTP/1.1
+    Accept:text/html,application/xhtml+xml,...
+    User-Agent:Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537...
+    Host:<us>
+    Connection:close
+```
+
+No cloud involvement. The probe is safe by construction: the listener always
+returns `404` and the offered MD5 is deliberately wrong, so the download cannot
+complete and `flashcp` is never reached.
+
+### Handler: `ubia_FirmwareUpdateProc` @ `0x4e6940`
+```c
+if (g_update_flag)                       // @0x939e94 — else-path, no 4632 reply
+    ...;
+if (version == current_version_for_type) // early out; replies 4632, does nothing
+    ...;
+reply 4632 {progress=0, result=0};  g_update_flag = 1;
+switch (file_type) {                     // payload[4], saved to g_update_type @0x939e90
+  case 1: case 2: pthread_create(0x4e6050);   // <-- the ONLY downloading branch
+  case 7: case 10:  MCU / 4G-modem images
+  default:          return;                   // <-- file_type 0 does NOTHING
+}
+```
+**`file_type=0` is a trap:** it latches `g_update_flag` and spawns no thread, so
+nothing ever clears the flag and every later 4631 is ignored until reboot. Use 1
+or 2. After a *failed* download the thread clears the flag (`0x4e63f0`), so
+probing is freely repeatable — verified by two back-to-back runs.
+
+### Download thread `0x4e6050`
+Waits up to ~15 s (301 × 50 ms) for a busy flag at `gp+0xadd` to clear, then
+dispatches on `g_update_type` and calls the downloader (`0x41ea40` for type 1).
+It composes its own request URL as `http://%s/firmware/%s` (`0x80dc70`) — which
+is why the GET path is `/firmware/` and not the path we supplied. Only the
+**host and port** of our `file_url` are honoured; a server must simply answer
+whatever path is requested.
+
+### Why this matters
+```
+download -> /tmp/update.bin -> image-head CRC + MD5 -> /sbin/flashcp -v /tmp/update.bin /dev/mtd3
+                                                    -> /sbin/flashcp -v /tmp/update.bin /dev/mtd4
+```
+* **No signature.** Integrity is a CRC in the image header plus an MD5 that *we
+  supply in the same request we control*.
+* It writes **only mtd3 (rootfs) and mtd4 (system)** — never mtd0 (U-Boot) or
+  mtd2 (kernel), so a bad image cannot brick the bootloader.
+
+⇒ **Custom firmware over the network, with no hardware modification, is on the
+table.** Still unknown: the exact OTA image-header layout the CRC covers
+(`pCurlOtaHead->stUpdateHead`, `T31OtaHead` with `name`, `totalLen`,
+`sensorType`, `is4G`).
+
 ## Consequence for installing custom firmware
 No secure boot (U-Boot only does a uImage CRC32), so custom firmware **will**
-boot. But with no console input and no shell, the only write path is
-**chip-off → clip → flashrom → resolder**. That same operation is also the only
-way to back up the primary's unique per-device data (UID/MAC/Wi-Fi/AE calibration),
-so a single chip-off covers backup + flash.
+boot. Two write paths now exist:
+1. **Network OTA (above)** — no disassembly, no soldering, bootloader-safe.
+   Preferred, pending the image-header format.
+2. **chip-off → clip → flashrom → resolder** — still the only way to back up the
+   *primary* camera's unique per-device data (UID/MAC/Wi-Fi/AE calibration), and
+   the recovery path if an OTA image leaves the device unbootable.
