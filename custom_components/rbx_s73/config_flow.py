@@ -23,6 +23,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_CLIENT_IP,
     CONF_HOST,
+    CONF_PTZ_STEP,
     CONF_SESSION_MODE,
     CONF_TL_COMPILE_HOUR,
     CONF_TL_DIR,
@@ -31,6 +32,7 @@ from .const import (
     CONF_TL_RATE,
     CONF_TL_RATE_UNIT,
     CONF_UID,
+    DEFAULT_PTZ_STEP,
     DEFAULT_SESSION_MODE,
     DEFAULT_TL_COMPILE_HOUR,
     DEFAULT_TL_DIR,
@@ -39,6 +41,8 @@ from .const import (
     DEFAULT_TL_RATE,
     DEFAULT_TL_RATE_UNIT,
     DOMAIN,
+    PTZ_STEP_MAX,
+    PTZ_STEP_MIN,
     SESSION_MODES,
     TL_UNIT_SECONDS,
 )
@@ -127,6 +131,12 @@ class RbxS73OptionsFlow(OptionsFlow):
                     SelectSelectorConfig(
                         options=SESSION_MODES, translation_key="session_mode"
                     )
+                ),
+                vol.Optional(
+                    CONF_PTZ_STEP,
+                    default=opts.get(CONF_PTZ_STEP, DEFAULT_PTZ_STEP),
+                ): vol.All(
+                    vol.Coerce(float), vol.Range(min=PTZ_STEP_MIN, max=PTZ_STEP_MAX)
                 ),
                 vol.Optional(
                     CONF_TL_RATE, default=opts.get(CONF_TL_RATE, DEFAULT_TL_RATE)

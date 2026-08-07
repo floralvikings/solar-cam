@@ -20,12 +20,14 @@ PTZ_DIRECTIONS = {
     "up": "mdi:arrow-up-bold",
     "down": "mdi:arrow-down-bold",
 }
-# A press = a nudge: repeat the direction command every PTZ_REPEAT_INTERVAL for
-# PTZ_NUDGE_SECONDS, then stop. The motor moves a small step/burst per command
-# (that's how repeated commands walked it to its limit in testing), so a single
-# command is imperceptible — repeating accumulates a visible move. Press again to
-# move further; the whole PTZ range was ~10 commands.
-PTZ_NUDGE_SECONDS = 1.0
+# A press runs the motor for `ptz_step_seconds`, then sends STOP — the same shape
+# as the app, which taps a direction and follows it with STOP ~250 ms later.
+# Configurable per camera: Settings -> Devices & Services -> RBX-S73 -> Configure.
+CONF_PTZ_STEP = "ptz_step_seconds"
+DEFAULT_PTZ_STEP = 0.25          # seconds of movement per button press
+PTZ_STEP_MIN = 0.05
+PTZ_STEP_MAX = 5.0
+# For steps longer than this, re-send the direction so the motor keeps running.
 PTZ_REPEAT_INTERVAL = 0.3
 
 

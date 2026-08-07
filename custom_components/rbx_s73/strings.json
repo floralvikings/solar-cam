@@ -21,10 +21,11 @@
   "options": {
     "step": {
       "init": {
-        "title": "Camera & time-lapse settings",
+        "title": "Camera, PTZ & time-lapse settings",
         "description": "Session model controls how the single camera connection is kept (a battery vs. reliability trade-off). Time-lapse captures frames on a schedule when its switch is on.",
         "data": {
           "session_mode": "Session model",
+          "ptz_step_seconds": "Pan/tilt movement per button press (seconds)",
           "timelapse_rate": "Frames to capture",
           "timelapse_rate_unit": "Per",
           "timelapse_fps": "Output video frame rate (fps)",
@@ -55,7 +56,7 @@
   "services": {
     "compile_timelapse": {
       "name": "Compile time-lapse",
-      "description": "Compile captured frames into a saved mp4 — a single day or a multi-day range.",
+      "description": "Compile captured frames into a saved mp4 \u2014 a single day or a multi-day range.",
       "fields": {
         "start_date": {
           "name": "Start date",

@@ -27,8 +27,11 @@ from .const import (
     CONF_SESSION_MODE,
     CONF_UID,
     DEFAULT_SESSION_MODE,
-    PTZ_NUDGE_SECONDS,
+    CONF_PTZ_STEP,
+    DEFAULT_PTZ_STEP,
     PTZ_REPEAT_INTERVAL,
+    PTZ_STEP_MAX,
+    PTZ_STEP_MIN,
     SESSION_MODE_KEEP_WARM,
     SESSION_MODE_ON_DEMAND,
     SESSION_MODE_PERMANENT,
@@ -106,9 +109,21 @@ class RbxS73Device:
             await asyncio.sleep(0.3)
         return False
 
+    def ptz_step(self) -> float:
+        """Seconds of motor movement per button press (per-camera option)."""
+        try:
+            step = float(self.entry.options.get(CONF_PTZ_STEP, DEFAULT_PTZ_STEP))
+        except (TypeError, ValueError):
+            step = DEFAULT_PTZ_STEP
+        return max(PTZ_STEP_MIN, min(PTZ_STEP_MAX, step))
+
     async def async_ptz(self, direction: str) -> None:
-        """Nudge pan/tilt: repeat the direction (the motor steps per command) for
-        a short window, then stop. Repeats accumulate a visible move."""
+        """Nudge pan/tilt: run the motor for the configured step, then STOP.
+
+        The PTZ command starts continuous movement and runs until STOP (the app
+        behaves the same way), so the step duration — not a repeat count — is
+        what sets how far the camera travels per press.
+        """
         ready = await self._ensure_ready()
         try:
             if not ready:
@@ -117,15 +132,19 @@ class RbxS73Device:
                     "socket at %s)", direction, self.control_sock
                 )
                 return
-            loop = asyncio.get_running_loop()
-            end = loop.time() + PTZ_NUDGE_SECONDS
-            n = 0
-            while loop.time() < end:
-                await self.hass.async_add_executor_job(self._sendto, f"ptz {direction}")
-                n += 1
-                await asyncio.sleep(PTZ_REPEAT_INTERVAL)
+            step = self.ptz_step()
+            await self.hass.async_add_executor_job(self._sendto, f"ptz {direction}")
+            remaining = step
+            while remaining > 0:
+                nap = min(PTZ_REPEAT_INTERVAL, remaining)
+                await asyncio.sleep(nap)
+                remaining -= nap
+                if remaining > 0:  # long step: keep the motor going
+                    await self.hass.async_add_executor_job(
+                        self._sendto, f"ptz {direction}"
+                    )
             await self.hass.async_add_executor_job(self._sendto, "ptz stop")
-            _LOGGER.debug("PTZ %s: sent %d step commands then stop", direction, n)
+            _LOGGER.debug("PTZ %s for %.2fs then stop", direction, step)
         finally:
             self._schedule_control_release()
 
