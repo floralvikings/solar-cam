@@ -190,28 +190,76 @@ nothing ever clears the flag and every later 4631 is ignored until reboot. Use 1
 or 2. After a *failed* download the thread clears the flag (`0x4e63f0`), so
 probing is freely repeatable — verified by two back-to-back runs.
 
-### Download thread `0x4e6050`
-Waits up to ~15 s (301 × 50 ms) for a busy flag at `gp+0xadd` to clear, then
-dispatches on `g_update_type` and calls the downloader (`0x41ea40` for type 1).
-It composes its own request URL as `http://%s/firmware/%s` (`0x80dc70`) — which
+### Call chain (each function identified by its own `__func__` string)
+```
+ubia_FirmwareUpdateProc  0x4e6940   ioType 4631 handler
+  └ pthread  0x4e6050               waits ≤15 s for a busy flag (gp+0xadd)
+      └ ubia_http_download 0x41ea40
+          └ pthread  download_auto_update 0x41a98c   <-- HTTP, CRC, flash
+```
+`download_auto_update` takes one heap argument, `struct { int type; char url[]; }`,
+and composes its own request URL as `http://%s/firmware/%s` (`0x80dc70`) — which
 is why the GET path is `/firmware/` and not the path we supplied. Only the
 **host and port** of our `file_url` are honoured; a server must simply answer
-whatever path is requested.
+whatever path is requested. The captured request matched this function's format
+strings exactly (`GET %s HTTP/1.1`, that Accept/User-Agent/Host/Connection set),
+which is how we know our probe lands here and not on some other download path.
+
+## OTA container format — **fully recovered**
+
+Implemented and unit-tested in `scripts/ota_image.py` (`verify` / `build`).
+32-byte header, then the payload:
+
+| Offset | Size | In CRC? | Meaning |
+|--------|------|---------|---------|
+| `0x00` | u32 | **no** — zeroed before hashing | purpose unidentified |
+| `0x04`–`0x18` | 6 × u32 | yes | purpose unidentified; **nothing on this path validates them** |
+| `0x1c` | u32 | zeroed before hashing | **CRC-32 of the image; must be non-zero** |
+
+Verification, transcribed from `0x41c248`:
+```c
+copy = header;  copy.word[0] = 0;  copy.word[7] = 0;   // 0x41c29c / 0x41c2a0
+crc  = crc32_raw(0,   &copy,        32);               // 0x41c2a4
+crc  = crc32_raw(crc, buf + 0x20,   total - 32);       // 0x41c2bc
+valid = (stored != 0) && (crc == stored);              // 0x41c968 / 0x41c2c8
+```
+
+`crc32_raw` @`0x4c1b14` is a **table-less reflected CRC-32** (poly `0xEDB88320`)
+with **no initial inversion and no final inversion** — the seed goes in as-is and
+the accumulator comes back as-is, which is what makes the two chained calls above
+equivalent to one pass over `header' || payload`. In Python:
+`zlib.crc32(data, seed ^ 0xffffffff) ^ 0xffffffff`. The unit tests assert this
+against an instruction-for-instruction transcription of the loop.
+
+On success the **header is stripped** and only the payload is flashed:
+```c
+SaveDownLoadFile("/tmp/update.bin", buf + 0x20, total - 0x20);   // 0x41d140
+system("/sbin/flashcp -v /tmp/update.bin /dev/mtd3");            // 0x41d304
+```
 
 ### Why this matters
-```
-download -> /tmp/update.bin -> image-head CRC + MD5 -> /sbin/flashcp -v /tmp/update.bin /dev/mtd3
-                                                    -> /sbin/flashcp -v /tmp/update.bin /dev/mtd4
-```
-* **No signature.** Integrity is a CRC in the image header plus an MD5 that *we
-  supply in the same request we control*.
+* **No signature anywhere.** Integrity is this CRC plus an MD5 that *we supply
+  in the same request that names the URL*.
 * It writes **only mtd3 (rootfs) and mtd4 (system)** — never mtd0 (U-Boot) or
   mtd2 (kernel), so a bad image cannot brick the bootloader.
+* The CRC is a plain checksum over data we author, so a valid image is
+  constructible offline: `python scripts/ota_image.py build --payload X --out Y`.
 
 ⇒ **Custom firmware over the network, with no hardware modification, is on the
-table.** Still unknown: the exact OTA image-header layout the CRC covers
-(`pCurlOtaHead->stUpdateHead`, `T31OtaHead` with `name`, `totalLen`,
-`sensorType`, `is4G`).
+table.**
+
+**Not yet known / unverified:**
+* The semantics of header words 1–6. They are covered by the CRC but unread on
+  this path, so all-zero should work — *untested against a real device.*
+* Whether `Content-Length` is mandatory (`not find Content-Length:` @`0x80e362`
+  suggests it is) and whether a chunked reply is tolerated.
+* A **second, richer container** exists for the curl/cloud path
+  (`pCurlOtaHead->stUpdateHead`): a multi-record archive logging
+  `imageTotalLen %d sensorType %d Read %d records:` and per record
+  `index %d Name = %s, offset = %d, len = %d crc %x`. It uses the *same* CRC
+  routine. Not needed for the 4631 path, but it is probably the shape of the
+  vendor's published images — worth confirming against a real one before
+  trusting the simple format end-to-end.
 
 ## Consequence for installing custom firmware
 No secure boot (U-Boot only does a uImage CRC32), so custom firmware **will**
