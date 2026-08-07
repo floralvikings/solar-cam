@@ -1,0 +1,30 @@
+tools/query.py
+  s_dbf2d9868b1659::t_2bcb36d3193630 1-99
+tools/motion_listen.py
+  s_dbf2d9868b1659::t_2bcb36d3193630 1-95
+tools/focus_assist.py
+  s_dbf2d9868b1659::t_dd26035540e3ef 86-87
+  s_dbf2d9868b1659::t_304fd38adbd980 1-85
+tools/rly2.py
+  s_dbf2d9868b1659::t_2bcb36d3193630 1-104
+tools/fwtest.py
+  s_dbf2d9868b1659::t_2bcb36d3193630 1-128
+tools/rly.py
+  s_dbf2d9868b1659::t_2bcb36d3193630 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2302202709825010b9b9149a4f5883683989015f",
+  "prompts": {},
+  "sessions": {
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
