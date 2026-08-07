@@ -248,6 +248,42 @@ system("/sbin/flashcp -v /tmp/update.bin /dev/mtd3");            // 0x41d304
 ⇒ **Custom firmware over the network, with no hardware modification, is on the
 table.**
 
+### Getting a genuine vendor image to validate against — **still blocked**
+
+The container format above is transcribed from the device binary, not confirmed
+against a real vendor image. Attempts so far (`tools/ota_check.py`):
+
+| Attempt | Result |
+|---|---|
+| `POST /api/v2/user/check_version`, real version, no token | `{"code":0,"data":"","msg":"success"}` |
+| same, claiming 1.0.21.9 / 1.0.20.0 / 1.0.0.1 (older) | identical empty `data` |
+| same with `pkid` corrected from 151 → 1 | identical empty `data` |
+| `POST /api/v3/user/qry/device/check_version/v3` | 404 — and `checkVersionV3` has **no callers** in the APK, so it is dead code |
+
+Facts established while trying:
+* The v2 endpoint answers **without** `X-Ubia-Auth-UserToken` — the token is not
+  what gates it at the transport level.
+* The device's real packed version is **`0x0100150a` = `1.0.21.10`**, read live
+  from `GET_ADVANCESETTINGS` (961) at body `+0x20` — so `pkid` is **1**. The
+  "2455" in `2455.0.21.10` is the *ModelNum* from the `tag` partition, not the
+  version's first octet; `pkid_for()` deriving 151 from it was wrong.
+* Model string `RBX-S73-WIFI`, product `RBX` (961 body `+0x00` / `+0x10`).
+* Lowering the claimed version changes nothing, which suggests the service
+  answers from **its own record for the UID** rather than trusting the caller's
+  claim — so an account-scoped request is probably required to get it to resolve
+  the device at all.
+
+**Next step needs a capture, not more guessing:** run the mitmproxy + WireGuard
+setup in `capture-procedure.md`, open the app's firmware-update screen, and save
+the real `user/check_version` request. That pins the exact body *and* the token,
+after which `tools/ota_check.py --token …` can replay it with a lowered version.
+
+If the vendor turns out to publish no image for this product at all, the only
+remaining end-to-end validation is to serve a **CRC-valid image whose payload is
+the camera's own current mtd3 content** from `flash_stock_verified.bin` — a
+write that restores identical bytes. That is still a real flash write and must
+not happen without explicit sign-off and the chip-off restore path ready.
+
 **Not yet known / unverified:**
 * The semantics of header words 1–6. They are covered by the CRC but unread on
   this path, so all-zero should work — *untested against a real device.*

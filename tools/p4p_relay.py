@@ -239,6 +239,7 @@ def open_relay_session(*, uid: str | None = None, camera_ip: str | None = None,
 
     session_port: int | None = None
     index = 0
+    saw_rsp = False
     for _ in range(6):
         sock.sendto(req, (camera_ip, LAN_SEARCH_PORT))
         deadline = time.monotonic() + 1.0
@@ -258,6 +259,7 @@ def open_relay_session(*, uid: str | None = None, camera_ip: str | None = None,
             mt = _msgtype(dd)
             if mt == RLY_STREAM_RSP:
                 session_port = addr[1]
+                saw_rsp = True
                 body = _body(dd)
                 index = body[0x35] if len(body) > 0x35 else 0
             elif session_port is None and mt == 0x1406:
@@ -272,7 +274,8 @@ def open_relay_session(*, uid: str | None = None, camera_ip: str | None = None,
     session = RelaySession(sock=sock, camera_ip=camera_ip, session_port=session_port,
                            conv=conv, index=index, rcv=KcpReceiver(conv), snd=KcpSender(conv))
     if verbose:
-        print(f"relay session up: port={session_port} index={index} conv=0x{conv:08x}")
+        print(f"relay session up: port={session_port} index={index} conv=0x{conv:08x}"
+              f"{'' if saw_rsp else '  [WARNING: no 0x1106 seen — index is a guess]'}")
     session.pump(settle)
 
     # knock 0x130b -> 0x130c (status 0000 = accepted) -> confirm 0x130d
