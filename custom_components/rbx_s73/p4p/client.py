@@ -33,6 +33,14 @@ LAN_SEARCH_PORT = 32762
 # ioctrl (AVIOCTRLDEFs.java); PTZ opcodes from ENUM_PTZCMD.
 IOTYPE_PTZ = 4097
 PTZ_OPCODE = {"left": 6, "right": 3, "up": 1, "down": 2, "stop": 0}
+IOTYPE_NIGHTLIGHT = 46          # UBIA_IO_SET_NIGHTLIGHT (resp 47)
+
+
+def _light_data(on: bool) -> bytes:
+    """SET_NIGHTLIGHT payload — captured from the app: 12 bytes, state at [6].
+    ON = ...00 01 00..., OFF = all zero. Camera answers ioType 47 with the
+    state echoed plus a success byte."""
+    return bytes([0, 0, 0, 0, 0, 0, 1 if on else 0, 0, 0, 0, 0, 0])
 
 
 def _ptz_data(opcode: int, speed: int = 8) -> bytes:
@@ -47,13 +55,16 @@ def _ptz_data(opcode: int, speed: int = 8) -> bytes:
 def parse_control_command(text: str) -> tuple[int, bytes] | None:
     """Map a text control command to (iotype, data). Returns None if unknown.
 
-    Grammar: ``ptz <left|right|up|down|stop>`` | ``ioctrl <iotype> <hexdata>``.
+    Grammar: ``ptz <left|right|up|down|stop>`` | ``light <on|off>``
+    | ``ioctrl <iotype> <hexdata>``.
     """
     parts = text.strip().split()
     if not parts:
         return None
     if parts[0] == "ptz" and len(parts) >= 2 and parts[1] in PTZ_OPCODE:
         return IOTYPE_PTZ, _ptz_data(PTZ_OPCODE[parts[1]])
+    if parts[0] == "light" and len(parts) >= 2 and parts[1] in ("on", "off"):
+        return IOTYPE_NIGHTLIGHT, _light_data(parts[1] == "on")
     if parts[0] == "ioctrl" and len(parts) >= 3:
         try:
             return int(parts[1]), bytes.fromhex(parts[2])

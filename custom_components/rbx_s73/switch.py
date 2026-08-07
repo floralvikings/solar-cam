@@ -28,7 +28,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the time-lapse switch and register its compile service."""
     device: RbxS73Device = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([RbxS73TimelapseSwitch(device)])
+    async_add_entities([RbxS73TimelapseSwitch(device), RbxS73NightlightSwitch(device)])
 
     platform = async_get_current_platform()
     platform.async_register_entity_service(
@@ -116,3 +116,38 @@ class RbxS73TimelapseSwitch(SwitchEntity, RestoreEntity):
             "path": path,
             "media_source": f"media-source://media_source/local/{rel}",
         }
+
+
+class RbxS73NightlightSwitch(SwitchEntity):
+    """The camera's night light (ioType 46, SET_NIGHTLIGHT).
+
+    Assumed state: the command is fire-and-forget. Our local session can send
+    ioctrl but the camera does not route responses back to it yet, so we cannot
+    read the real lamp state — HA shows what we last commanded.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Night light"
+    _attr_icon = "mdi:lightbulb-night"
+    _attr_assumed_state = True
+
+    def __init__(self, device: RbxS73Device) -> None:
+        self._device = device
+        self._attr_unique_id = f"{device.uid}_nightlight"
+        self._attr_is_on = False
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.uid)},
+            name=f"RBX-S73 {device.host}",
+            manufacturer="SEHMUA",
+            model="RBX-S73",
+        )
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._device.async_send_control("light on")
+        self._attr_is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._device.async_send_control("light off")
+        self._attr_is_on = False
+        self.async_write_ha_state()
