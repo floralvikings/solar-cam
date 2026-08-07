@@ -1,0 +1,34 @@
+custom_components/rbx_s73/config_flow.py
+  s_dbf2d9868b1659::t_4ac6c571b222e9 35,44-45,135-139
+  s_dbf2d9868b1659::t_21e8437fe8f3da 26
+  s_dbf2d9868b1659::t_c6465735d9d5cc 140
+custom_components/rbx_s73/strings.json
+  s_dbf2d9868b1659::t_e0e323799085d9 24,28,59
+custom_components/rbx_s73/coordinator.py
+  s_dbf2d9868b1659::t_f4019ad5d6d4aa 112-119,121-126,135-145,147
+  s_dbf2d9868b1659::t_c6c32facf8e006 30-31,33-34
+custom_components/rbx_s73/manifest.json
+  s_dbf2d9868b1659::t_e7bd1e2719b7a2 11
+custom_components/rbx_s73/const.py
+  s_dbf2d9868b1659::t_fa5d41ad2cd01a 23-30
+docs/home-assistant-ptz-card.md
+  s_dbf2d9868b1659::t_33bf43330a26ee 1-117
+custom_components/rbx_s73/translations/en.json
+  s_dbf2d9868b1659::t_e0e323799085d9 24,28,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "da6e24b10396ccdb1688ba2e1fa7813f356797fc",
+  "prompts": {},
+  "sessions": {
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
