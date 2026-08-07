@@ -1,0 +1,23 @@
+tests/test_ota_image.py
+  s_e0856ff1969df0::t_e2bc6d4b7372de 1-131
+docs/firmware-analysis.md
+  s_e0856ff1969df0::t_fb835cb146a120 193-201,204-206,208-224,226-237,239-242,245-246,249-262
+scripts/ota_image.py
+  s_e0856ff1969df0::t_81da87a71d2c07 1-228
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1117fa441fe98546edc43f6095de21aae623de6f",
+  "prompts": {},
+  "sessions": {
+    "s_e0856ff1969df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec7075e-73e2-4aae-906a-c5c7a4935d2f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
