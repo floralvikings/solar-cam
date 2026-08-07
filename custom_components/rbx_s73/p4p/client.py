@@ -250,7 +250,11 @@ class LanControlSession:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("", 0))
         my_port = s.getsockname()[1]
-        s.settimeout(0.25)
+        # The control socket is drained once per loop iteration, and this timeout
+        # bounds how long an iteration can block. A long timeout adds that much
+        # latency to a queued PTZ STOP — which overshoots badly, since the motor
+        # keeps running until STOP lands. Keep it short when control is enabled.
+        s.settimeout(0.03 if self.control_sock_path else 0.25)
 
         lsr = build_lanstreamreq(self.uid, conv=conv, password=pw,
                                  client_ip=self.client_ip, client_port=my_port)
@@ -289,6 +293,7 @@ class LanControlSession:
         snd = KcpSender(conv)
         avidx = 0
         last_alive = 0.0
+        last_rtx = 0.0
         last_data = time.monotonic()
         synced = False
         handshaked = False
@@ -301,9 +306,14 @@ class LanControlSession:
                     return
                 if now - last_alive > 1.0:
                     s.sendto(build_alive(conv), (self.camera_ip, sess_port))
+                    last_alive = now
+                # Retransmit unacked control segments briskly: a lost PTZ packet
+                # (especially STOP) means the motor keeps running until it lands,
+                # so a 1s retry would overshoot by a lot.
+                if now - last_rtx > 0.15 and snd.unacked:
                     for seg in snd.retransmit_segments():
                         s.sendto(build(0x1409, seg, aux=0x21), (self.camera_ip, sess_port))
-                    last_alive = now
+                    last_rtx = now
                 # drain control commands (socket only exists once ioctrl-ready)
                 if cs is not None:
                     while True:
