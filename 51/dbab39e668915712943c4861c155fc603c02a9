@@ -1,0 +1,70 @@
+tools/ptz_scale_test.py
+  s_dbf2d9868b1659::t_883d7d4ffdc072 148
+  s_dbf2d9868b1659::t_355cbf62eb5c20 1-147,149-181
+tools/ptz_over_kcp.py
+  s_dbf2d9868b1659::t_4f00ef93ffe190 1-186
+tools/ptz_probe.py
+  s_dbf2d9868b1659::t_db9b5bb0ce857a 1-134
+tools/knock_indexed.py
+  s_dbf2d9868b1659::t_21b5e04c1c902f 1-187
+tools/baud_sweep.py
+  s_dbf2d9868b1659::t_a8596f2be6c55a 1-30
+tools/knock_live.py
+  s_a6061006c7ef24::t_b2fdc8ead6aee4 1-116
+tools/serial_capture.py
+  s_dbf2d9868b1659::t_773f645c6b2c46 1-29
+tools/ptz_sweep.py
+  s_dbf2d9868b1659::t_4fc32607bbf1ee 1-126
+tools/ptz_fast.py
+  s_dbf2d9868b1659::t_23319eab63fa96 55
+  s_dbf2d9868b1659::t_d0c373e5d48aaa 1-54,56-117
+tools/ioctrl_probe.py
+  s_dbf2d9868b1659::t_d8ed79d0b79d8d 1-17,20-149
+  s_dbf2d9868b1659::t_1b31a52c72fe0c 18-19
+tools/control_session_test.py
+  s_dbf2d9868b1659::t_b54d773b68088d 1-46
+tools/knock_after_stream.py
+  s_a6061006c7ef24::t_23e7a4ce6ed239 1-134
+tools/ioctrl_diag.py
+  s_dbf2d9868b1659::t_90bf2c66b8b6b0 1-75,77-175
+  s_dbf2d9868b1659::t_7a2dd930e0a4d6 76
+tools/ptz_snapshot.py
+  s_dbf2d9868b1659::t_53006731d312e7 22-24
+  s_dbf2d9868b1659::t_f89117b0dc410b 143,145-148,150
+  s_dbf2d9868b1659::t_0ba22039ec7ec7 1-6,8-13,16-21,25-28,32-142,144,149,151-158
+  s_dbf2d9868b1659::t_c22af2f8c1f94e 7
+  s_dbf2d9868b1659::t_f56781021f43c1 14-15
+  s_dbf2d9868b1659::t_b0bd517bf38242 29-31
+tools/ptz_demo.py
+  s_dbf2d9868b1659::t_433d45c2f7f607 1-134
+tools/ptz_sweep_snap.py
+  s_dbf2d9868b1659::t_965e8ed3cdf63e 1-161
+tools/index_debug.py
+  s_dbf2d9868b1659::t_d5dbbea4cc6588 1-80
+tools/p4p_ext.py
+  s_dbf2d9868b1659::t_b633f1e8a3ec8a 1-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "51dbab39e668915712943c4861c155fc603c02a9",
+  "prompts": {},
+  "sessions": {
+    "s_a6061006c7ef24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0eb50487-34fe-481b-9ae8-93b6ba2bf0f7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    },
+    "s_dbf2d9868b1659": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdc80dcc-a9f7-41ec-b91f-499ef51993ba",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
