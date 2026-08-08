@@ -320,6 +320,25 @@ the camera's own current mtd3 content** from `flash_stock_verified.bin` — a
 write that restores identical bytes. That is still a real flash write and must
 not happen without explicit sign-off and the chip-off restore path ready.
 
+### Complete recipe for a network flash (nothing here is guesswork any more)
+
+1. Open a relay session (`tools/p4p_relay.py`) — LAN only, no cloud.
+2. Send ioType **4631** with:
+   * `file_type = 1` — the only value that reaches a main-SoC flash
+   * `version` = anything ≠ the installed `0x0100150a`, else the handler
+     early-outs; `0x7fffffff` is safe
+   * `file_url` = `http://<us>:<port>/anything` — only host:port are honoured
+   * `file_size` = the image length
+   * `md5sum` = **ignored** — `ubia_FirmwareUpdateProc` copies only
+     `payload[0x2c..0xac]` (the URL) and `payload[8]` (file_size) into the
+     thread's parameter block; the MD5 at `payload[12..44]` is never read.
+     Integrity on this path is the CRC32 alone.
+3. Answer *any* path the camera GETs with `32-byte header || payload`, built by
+   `scripts/ota_image.py build`. Serve a `Content-Length` (`not find
+   Content-Length:` @`0x80e362` is a hard failure).
+4. The camera CRCs it, strips the header, writes the payload to
+   `/tmp/update.bin`, and runs `flashcp -v /tmp/update.bin /dev/mtd4`.
+
 **Not yet known / unverified:**
 * The semantics of header words 1–6. They are covered by the CRC but unread on
   this path, so all-zero should work — *untested against a real device.*
