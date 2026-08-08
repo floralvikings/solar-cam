@@ -18,18 +18,20 @@ Struct verified two ways (they agree):
     ``AdvancedSettings.updateFw()`` as ``sendIoCtrl(data, 4631)``
   * device — ``src/ubia_update.c`` strings in ``ubia_t23``
 
-``file_type`` matters, and 0 is a trap. ``ubia_FirmwareUpdateProc`` @0x4e6940::
+``file_type`` decides which downloader runs, and they end in different places
+(see docs/firmware-analysis.md for the full table). Verified live:
 
-    if (g_update_flag) -> takes a different path and never answers
-    if (version == current_version_for_type) -> answers 4632, does nothing
-    answer 4632; g_update_flag = 1
-    switch (file_type):
-        1, 2 -> pthread_create(0x4e6050)   <-- the ONLY branch that downloads
-        7, 10 -> other components (MCU / 4G modem)
-        default (incl. 0) -> return, having done nothing
+    0  -> answers 4632, spawns nothing, and LATCHES g_update_flag so every
+          later 4631 is ignored until the camera reboots. Never send this.
+    1  -> single fetch -> ubia_ota_update_liteos -> flashcp /dev/mtd4  <-- the
+          only path that flashes the main SoC
+    2  -> five fetches -> download_auto_update(type=2) -> "unknow type", no write
+    10 -> five fetches -> /tmp/update_hi3861.bin (the ESP32 Wi-Fi part)
+    11 -> rejected before the thread; would have been mtd3. Also latches the flag.
 
-So ``file_type=0`` sets the flag, spawns no thread, and nothing ever clears it —
-every later 4631 is then ignored until the camera reboots. Send 1 or 2.
+The five-versus-one connection count is ``download_auto_update``'s
+``reDownloadCount < 5`` retry loop, and is how the two downloaders are told apart
+on the wire.
 
 Usage:  .venv/bin/python tools/fwtest.py [--port 8080] [--ftype 1] [--all]
 """

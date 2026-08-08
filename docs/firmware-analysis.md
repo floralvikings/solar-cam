@@ -186,24 +186,38 @@ switch (file_type) {                     // payload[4], saved to g_update_type @
 }
 ```
 **`file_type=0` is a trap:** it latches `g_update_flag` and spawns no thread, so
-nothing ever clears the flag and every later 4631 is ignored until reboot. Use 1
-or 2. After a *failed* download the thread clears the flag (`0x4e63f0`), so
-probing is freely repeatable — verified by two back-to-back runs.
+nothing ever clears the flag and every later 4631 is ignored until reboot. After
+a *failed* download the spawned thread clears the flag, so probing with a type
+that does spawn one is freely repeatable — verified by back-to-back runs.
 
-### Call chain (each function identified by its own `__func__` string)
-```
-ubia_FirmwareUpdateProc  0x4e6940   ioType 4631 handler
-  └ pthread  0x4e6050               waits ≤15 s for a busy flag (gp+0xadd)
-      └ ubia_http_download 0x41ea40
-          └ pthread  download_auto_update 0x41a98c   <-- HTTP, CRC, flash
-```
-`download_auto_update` takes one heap argument, `struct { int type; char url[]; }`,
-and composes its own request URL as `http://%s/firmware/%s` (`0x80dc70`) — which
-is why the GET path is `/firmware/` and not the path we supplied. Only the
-**host and port** of our `file_url` are honoured; a server must simply answer
-whatever path is requested. The captured request matched this function's format
-strings exactly (`GET %s HTTP/1.1`, that Accept/User-Agent/Host/Connection set),
-which is how we know our probe lands here and not on some other download path.
+### `file_type` decides everything (functions named by their `__func__` strings)
+
+The thread at `0x4e6050` re-dispatches on `g_update_type`, and the branches end
+in completely different places. **Only `file_type=1` flashes the main SoC.**
+
+| `file_type` | Path | Flashes | Fetch verified live |
+|---|---|---|---|
+| 0 | — (returns immediately) | nothing; **jams 4631 until reboot** | no fetch |
+| **1** | `ubia_http_download` → pthread `download` `0x4188e8` → **`ubia_ota_update_liteos` `0x425364`** | **`/dev/mtd4`** | ✅ 1 request |
+| 2 | pthread `download_auto_update` `0x41a98c`, `type=2` | falls to `unknow type=%d` — **nothing** | ✅ 5 requests |
+| 7 | MCU image | — | not tested |
+| 10 | `download_auto_update`, `type=10` | `/tmp/update_hi3861.bin` (ESP32 Wi-Fi part) | ✅ 5 requests |
+| 11 | **rejected at the ioctrl layer** — would have hit `flashcp /dev/mtd3` | nothing | ✅ no fetch, as predicted |
+
+The retry count is a reliable fingerprint: `download_auto_update` has a
+`reDownloadCount < 5` loop, so types 2 and 10 produce exactly five connections
+one second apart, while type 1 produces a single one. That is how the two
+downloaders were told apart on the wire.
+
+`mtd3` is reachable only from `download_auto_update`'s `type == 11` branch, and
+`type` is `g_update_type` verbatim (`lw $a1, -0x6170($s0)` at `0x4e61e8`, right
+before the call). Since `file_type=11` never spawns a thread, **that branch is
+dead on the 4631 path** — confirmed live: type 11 answers 4632 and never fetches.
+
+Both downloaders compose their own request URL as `http://%s/firmware/%s`
+(`0x80dc70`), which is why the GET path is `/firmware/` and not the one we
+supplied. Only the **host and port** of our `file_url` are honoured; a server
+must simply answer whatever path is requested.
 
 ## OTA container format — **fully recovered**
 
@@ -231,22 +245,44 @@ equivalent to one pass over `header' || payload`. In Python:
 `zlib.crc32(data, seed ^ 0xffffffff) ^ 0xffffffff`. The unit tests assert this
 against an instruction-for-instruction transcription of the loop.
 
-On success the **header is stripped** and only the payload is flashed:
+On success the **header is stripped** and only the payload is flashed. On the
+reachable (`file_type=1`) path, `ubia_ota_update_liteos` @`0x425364` does it by
+hand rather than via `SaveDownLoadFile`:
 ```c
-SaveDownLoadFile("/tmp/update.bin", buf + 0x20, total - 0x20);   // 0x41d140
-system("/sbin/flashcp -v /tmp/update.bin /dev/mtd3");            // 0x41d304
+system("cp /sbin/flashcp  /tmp");                       // 0x425438
+fd = open("/tmp/update.bin", O_WRONLY|O_CREAT);         // 0x425448
+s0 = 0x20;                                              // skip the header
+while (s0 < total) s0 += write(fd, buf + s0, total - s0);   // 0x42548c
+system("/sbin/flashcp -v /tmp/update.bin /dev/mtd4");   // 0x4259c8
 ```
+
+### Confirmed twice, independently — no vendor image needed
+`ubia_ota_update_liteos` (`file_type=1`, flashes mtd4) and `download_auto_update`
+(`type=11`, flashes mtd3) each implement the container check **separately**, and
+they agree byte-for-byte: same 32-byte header, same word-0 and word-7 zeroing,
+same two-pass seeded `crc32_raw`, same `payload = buf + 0x20`. Two independent
+implementations agreeing is stronger evidence than a single sample image would
+have been, so the "get a real vendor image" blocker below is no longer on the
+critical path for validating the *format*.
 
 ### Why this matters
 * **No signature anywhere.** Integrity is this CRC plus an MD5 that *we supply
   in the same request that names the URL*.
-* It writes **only mtd3 (rootfs) and mtd4 (system)** — never mtd0 (U-Boot) or
-  mtd2 (kernel), so a bad image cannot brick the bootloader.
+* The reachable path writes **only mtd4 (`system`)** — never mtd0 (U-Boot) or
+  mtd2 (kernel), so a bad image cannot stop the board from booting.
 * The CRC is a plain checksum over data we author, so a valid image is
   constructible offline: `python scripts/ota_image.py build --payload X --out Y`.
 
 ⇒ **Custom firmware over the network, with no hardware modification, is on the
-table.**
+table** — specifically, replacing the `system` SquashFS, which holds `ubia_t23`,
+`bin/gpiotool` and the kernel modules. That is the whole vendor application
+layer.
+
+> **Recovery caveat — this is not risk-free.** U-Boot and the kernel survive any
+> mtd4 content, but `esp32_sdio.ko` (the Wi-Fi driver) lives *in* mtd4. A bad
+> image therefore costs the network, and with it any second OTA attempt — the
+> only way back is **chip-off + `flashrom -w captures/flash_stock_verified.bin`**.
+> "Cannot brick the bootloader" is not the same as "cannot require desoldering".
 
 ### Getting a genuine vendor image to validate against — **still blocked**
 

@@ -29,12 +29,18 @@ Verification, exactly as the device does it (@0x41c248)::
 seed is used as-is and the accumulator is returned as-is. That is what makes the
 two-call chaining above equivalent to one pass over ``header || payload``.
 
+This layout is confirmed by **two independent implementations** in the firmware
+that agree byte-for-byte — ``ubia_ota_update_liteos`` @0x425364 (reached with
+``file_type=1``, flashes ``/dev/mtd4``) and ``download_auto_update`` @0x41a98c
+(``type=11``, flashes ``/dev/mtd3``, unreachable via ioType 4631).
+
 There is **no signature**: integrity is this CRC plus an MD5 that the client
 supplies in the very same request that names the URL. On success the device
 writes only the payload — the header is stripped::
 
-    SaveDownLoadFile("/tmp/update.bin", buf + 0x20, total - 0x20)
-    system("/sbin/flashcp -v /tmp/update.bin /dev/mtd3")   # or /dev/mtd4
+    fd = open("/tmp/update.bin", O_WRONLY|O_CREAT)
+    s0 = 0x20;  while (s0 < total) s0 += write(fd, buf + s0, total - s0)
+    system("/sbin/flashcp -v /tmp/update.bin /dev/mtd4")
 
 Usage::
 
@@ -116,7 +122,8 @@ class VerifyResult:
         return (f"{verdict}\n"
                 f"  stored crc   : 0x{self.stored_crc:08x}\n"
                 f"  computed crc : 0x{self.computed_crc:08x}\n"
-                f"  payload      : {self.payload_len} bytes (flashed to mtd3/mtd4)")
+                f"  payload      : {self.payload_len} bytes "
+                f"(written to /dev/mtd4 via file_type=1)")
 
 
 def parse(image: bytes) -> OtaHeader:
