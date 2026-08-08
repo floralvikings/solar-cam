@@ -1,0 +1,28 @@
+tools/prudynt_try.py
+  s_e0856ff1969df0::t_809abc9949f88c 223,233
+docs/firmware-analysis.md
+  s_e0856ff1969df0::t_e76a44d377f99f 380-387
+tools/sd_setup.py
+  s_e0856ff1969df0::t_324353ed30a605 1-240
+docs/thingino-feasibility.md
+  s_e0856ff1969df0::t_6e60405b4eceb8 140-169
+  s_e0856ff1969df0::t_07b7bba30e38b0 170-210
+tools/build_system_image.py
+  s_e0856ff1969df0::t_999541d8dd5a84 1,3-4,10-38,44-47,70,72-76,79,81-97,117-118,121,136-140,155,157-160,165-174,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b929af4b587aa7fff1c4a206e81f23e0ce2c8205",
+  "prompts": {},
+  "sessions": {
+    "s_e0856ff1969df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec7075e-73e2-4aae-906a-c5c7a4935d2f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
