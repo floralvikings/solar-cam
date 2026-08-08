@@ -59,9 +59,57 @@ the vendor's sleep logic first.
 
 ## Verdict
 
-**A full thingino replacement on the primary camera is not advisable.** The
-Wi-Fi driver alone makes an unreachable-camera outcome likely, and the only
-recovery is desoldering.
+**A full thingino replacement — thingino's own kernel — is closed.** Confirmed
+offline from the module itself:
+
+```
+author=Hisilicon Wifi Team      depends=mmc_core,jzmmc
+vermagic=3.10.14-Archon preempt mod_unload MIPS32_R1 32BIT
+cfg80211 / ieee80211 / wiphy imports: 0
+```
+
+`hichannel.ko` imports **zero** cfg80211 symbols, so it registers no wiphy and
+`wpa_supplicant` cannot drive it (there is no `wpa_supplicant` on the device
+either). The `[cfg80211]` kthread is simply built into the kernel and unused by
+this driver. Association goes through a private vendor interface. A thingino
+kernel therefore means no Wi-Fi, and no way back in.
+
+## ✅ But the hybrid **is** viable — vendor kernel + our own userland
+
+Proven live 2026-08-07:
+
+| Question | Answer |
+|---|---|
+| Can the watchdog be stopped? | **Yes** — `touch /tmp/stopWdg`. The vendor's own escape hatch (`stop watchdog by file`, `wdt_disable ok` in `ubia_watchdog`). |
+| Does Wi-Fi need `ubia_t23`? | **No.** With `ubia_t23` killed, the shell stayed reachable **224 s+** with no reboot. |
+| Is the ISP freed? | **Yes**, once `ubia_t23` exits. |
+| Is it fail-safe? | **Yes** — `/tmp` is tmpfs, so any reboot re-arms the watchdog automatically. |
+
+Without the stop-file, killing `ubia_t23` reboots the box in ~10 s
+(`ubia_watchdog` monitors a heartbeat timestamp — `secondProcLastTime` /
+`secTimeOutMs` — and resets via `/dev/watchdog` or `HI_HAL_MCUHOST_JUST_RESET`).
+
+So the platform is: **vendor kernel + vendor rootfs** (keeps `hichannel` Wi-Fi,
+`tx-isp`, motors) **+ our own `/system`**, which we already flash safely over OTA.
+
+### Dev loop that needs no flashing at all
+busybox has **`tftp`**, so binaries can be pushed to `/tmp` and run directly:
+
+```sh
+tftp -g -r prudynt -l /tmp/prudynt <host>     # on the camera
+touch /tmp/stopWdg && killall ubia_t23 && /tmp/prudynt
+```
+Only bake into `/system` once something works. Reboot undoes everything.
+
+### The one remaining unknown: IMP ↔ tx-isp pairing
+Both vendor binaries **statically link** the Ingenic SDK, so there is no
+`libimp.so` to reuse. A streamer (e.g. thingino's `prudynt`) needs its own
+`libimp` for T23, and that userspace must match the **vendor's built-in
+`tx-isp` (`H20240430a`)** — thingino ships kernel+libimp as matched pairs, so
+version skew is the real risk here, not the flashing.
+
+Also needed: a MIPS **C** cross-compiler. Only binutils is installed locally
+(enough for `rbxsend`, not for `prudynt`).
 
 ## Sane paths forward
 
