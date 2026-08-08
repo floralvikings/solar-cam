@@ -1,0 +1,21 @@
+tools/hook.js
+  s_a6061006c7ef24::t_38557a390a4cba 1-6,9-14,16-28,34-38,40-45,47-48
+  s_a6061006c7ef24::t_12fcdbb48222e8 39,46
+  s_a6061006c7ef24::t_8eeae8ac8b209e 51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5d7b70776658f9a72890454a23feabe8cd9db421",
+  "prompts": {},
+  "sessions": {
+    "s_a6061006c7ef24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0eb50487-34fe-481b-9ae8-93b6ba2bf0f7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
