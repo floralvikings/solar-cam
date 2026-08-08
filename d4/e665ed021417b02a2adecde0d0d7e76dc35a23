@@ -1,0 +1,23 @@
+docs/firmware-analysis.md
+  s_e0856ff1969df0::t_6034e467a87963 407-452
+  s_e0856ff1969df0::t_435d3cf1c9afe3 498-519
+  s_e0856ff1969df0::t_f3d0735de3a132 360-406
+  s_e0856ff1969df0::t_a12aa7f6f03aaa 323-359
+  s_e0856ff1969df0::t_a4af260947af21 520
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d4e665ed021417b02a2adecde0d0d7e76dc35a23",
+  "prompts": {},
+  "sessions": {
+    "s_e0856ff1969df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec7075e-73e2-4aae-906a-c5c7a4935d2f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
