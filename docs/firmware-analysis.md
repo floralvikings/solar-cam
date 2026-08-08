@@ -339,6 +339,38 @@ not happen without explicit sign-off and the chip-off restore path ready.
 4. The camera CRCs it, strips the header, writes the payload to
    `/tmp/update.bin`, and runs `flashcp -v /tmp/update.bin /dev/mtd4`.
 
+### ✅ Executed end-to-end (2026-08-07) — the camera flashed and survived
+
+A **no-op rehearsal** was run against the primary camera: payload = the `system`
+partition sliced straight out of `flash_stock_verified.bin`, wrapped by
+`scripts/ota_image.py build`, served by `tools/fwflash.py`.
+
+```
+-> 4631 FIRMWARE_UPDATE_REQ  file_type=1  file_size=1769504
+   >>> GET http://<us>/firmware/ HTTP/1.1 -> 200, sending 1769504 bytes
+   >>> body sent in full
+   <- 4632 0000000000000000          (command ack)
+   <- 4630 0000000049000000          (progress 73)
+   <- 4630 0000000064000000          (progress 100)
+```
+
+The camera then rebooted and came back **completely healthy**: LAN-search
+answers, `ubia_t23` is running, the relay session + knock + ioctrl all work, and
+961 returns byte-identical device data. So the container format, the CRC rule,
+the `file_type=1` routing and the whole download path are **confirmed on real
+hardware**, not just in the disassembly.
+
+*Scope of that claim:* progress reaching 100 plus a clean reboot makes the
+`flashcp` write **strongly indicated**, but by design a no-op write leaves
+nothing observable — mtd4 could not be read back without a shell. Writing
+*modified* content is what would demonstrate the write directly.
+
+**Progress is reported back on ioType 4630**, which the app's headers call
+`FIRMWARE_UPDATE_CHECK_RSP` — an 8-byte body whose **second u32 LE is a
+percentage**. Observed during a real transfer: `00000000 49000000` (0x49 = 73),
+then repeated `00000000 64000000` (0x64 = 100). The immediate `4632` is only the
+command acknowledgement; 4630 is what tracks the actual write.
+
 **Not yet known / unverified:**
 * The semantics of header words 1–6. They are covered by the CRC but unread on
   this path, so all-zero should work — *untested against a real device.*
