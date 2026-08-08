@@ -1,0 +1,19 @@
+docs/thingino-feasibility.md
+  s_e0856ff1969df0::t_aeeaf6d1f64fb6 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "ee3b97267eb0e6d7519f68cc63ce38ac9e98cdf9",
+  "prompts": {},
+  "sessions": {
+    "s_e0856ff1969df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec7075e-73e2-4aae-906a-c5c7a4935d2f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
