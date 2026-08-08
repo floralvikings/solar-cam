@@ -1,0 +1,30 @@
+docs/thingino-feasibility.md
+  s_e0856ff1969df0::t_df56e625ccb678 104-137,164-172
+  s_e0856ff1969df0::t_d96bda2997801b 138-163
+tools/tftp_serve.py
+  s_e0856ff1969df0::t_21640b9837dfe1 1-138
+tools/prudynt_try.py
+  s_e0856ff1969df0::t_0b23fc1d7acf18 238-240,242-243,245-281
+  s_e0856ff1969df0::t_8409a99f7351aa 282-289
+  s_e0856ff1969df0::t_5ad1a1668739eb 119-125,131-135
+  s_e0856ff1969df0::t_029005b01dbcc7 181,244,292-293,295
+  s_e0856ff1969df0::t_72478bfb0cdbde 1-118,126-130,136-180,184-218,237,241,290-291,294,296-306
+  s_e0856ff1969df0::t_60531b6035aa18 182-183
+  s_e0856ff1969df0::t_d0868762f85217 219-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "ab4794ead6009c03b3b8d3f1e65c4558d46c10e0",
+  "prompts": {},
+  "sessions": {
+    "s_e0856ff1969df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec7075e-73e2-4aae-906a-c5c7a4935d2f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <floralvikings@gmail.com>"
+    }
+  }
+}
