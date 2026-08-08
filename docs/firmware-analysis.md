@@ -320,6 +320,136 @@ the camera's own current mtd3 content** from `flash_stock_verified.bin` — a
 write that restores identical bytes. That is still a real flash write and must
 not happen without explicit sign-off and the chip-off restore path ready.
 
+### ✅✅✅ CODE EXECUTION ON THE CAMERA (2026-08-07)
+
+`/system/bin/tag_env_info` is a **working hook**. `ubia_t23` persists settings by
+shelling out to it *by bare name*::
+
+    0x4b6194  snprintf(buf, 0x64, "tag_env_info --set UBIA md_level %d", v)
+    0x4b61b0  system(buf)
+
+so `/system/bin` must be on `PATH`. Replacing it with a `#!/bin/sh` wrapper that
+`exec`s the renamed `tag_env_info.real` therefore runs our code on every setting
+change, with zero functional breakage.
+
+**Proof (network-free).** Flipped the image in the UBox app, power-cycled, and
+the flip **persisted**. The live flip is just the video pipeline in RAM;
+*persistence* only happens via `tag_env_info`, and after the swap ours is the
+only `tag_env_info` on `PATH`. Nothing else could have written it.
+
+**Why nothing ever reached the listener:** this vendor busybox ships no usable
+network client. The payload tried `wget --post-file`, `wget` GET, `nc`, `telnet`
+and `ping` across three flashed images and not one produced a TCP connection —
+while the hook itself was firing the whole time. *Absence of a callback proved
+nothing about execution; do not use exfil as a liveness signal on this device.*
+
+Hooks that do **not** work, and why:
+* `/system/mkfs.vfat` — the format thread reaches `beqz $s3, 0x4dc808` with `s3`
+  unconditionally zero (set at 0x4dc494, never rewritten on any path in), so it
+  always runs the **bare** `mkfs.vfat`, never the absolute `/system/` form at
+  0x4dc824. And `/system` — unlike `/system/bin` — is not on `PATH`.
+* ioType 804 SETMOTIONDETECT — unhandled on this firmware: no response, and 961
+  comes back byte-identical.
+
+**Consequence:** we control the whole partition, so we are not limited to
+whatever applets busybox happens to have. A statically-linked MIPS binary shipped
+*inside* `/system` and launched from the wrapper sidesteps the missing-`wget`
+problem entirely — and makes an on-camera RTSP server a packaging job rather than
+a research problem.
+
+### Live system inventory (2026-08-07, via the hook + `rbxsend`)
+
+23 KB of `/tmp/rbx_recon.txt` retrieved off the running camera. Raw copy:
+`captures/recon-0.txt` (gitignored). The load-bearing facts:
+
+| Fact | Value |
+|---|---|
+| Privilege | **`uid=0(root)`** — everything below runs as root |
+| Kernel | `Linux Zeratul 3.10.14-Archon #1 PREEMPT Fri Jul 11 15:58:39 CST 2025 mips` |
+| `PATH` | **`/system/bin:/bin:/sbin:/usr/bin:/usr/sbin`** — our hook dir is *first* |
+| Sensor | `export SENSOR=cv2003` (confirmed, no longer inferred) |
+| `/config` | `/dev/mtdblock5` **jffs2 rw** — persistent writable storage |
+| `/system` | `/dev/mtdblock4` squashfs **ro** |
+| **`/dev/mtd11`** | **`"all"`, 0x800000 — the entire 8 MB flash as one device** |
+| busybox | 498212 bytes at `/bin/busybox` |
+
+**Why every exfil attempt failed:** the applet list has **no `wget` and no `nc`**.
+Three flashed images tried them. What *does* exist: **`telnetd`**, `tftp`,
+`ping`, `nslookup`, `udhcpc`, `vi`, `dd`, `flashcp`, `flash_eraseall`.
+
+`/etc/init.d/rcS` ends:
+```sh
+export PATH=/system/bin:/bin:/sbin:/usr/bin:/usr/sbin
+export SENSOR=cv2003            # also SOC_TYPE=SOC_T23ZN, FLASH_TYPE=NOR
+mount -t squashfs /dev/mtdblock4 /system
+insmod /system/hichannel.ko
+#telnetd                        # <-- vendor commented it out
+/system/ubia_t23   &
+```
+So `ubia_t23` is launched from `rcS` by absolute path (a wrapper there would
+work), and **telnetd is present but deliberately disabled**.
+
+`ps` caught the hook mid-flight, which is independent confirmation:
+```
+216 root  /bin/sh -c tag_env_info --set UBIA vide_flip 2
+217 root  {tag_env_info} /bin/sh /system/bin/tag_env_info --se
+```
+
+**Two consequences worth acting on:**
+1. `telnetd` already exists — an interactive root shell is one line, no new
+   binary needed.
+2. `/dev/mtd11` exposes the **whole 8 MB flash**. The *primary* camera's unique
+   per-device data (UID/MAC/Wi-Fi/AE calibration) can now be backed up **over
+   the network** (`dd if=/dev/mtd11 | rbxsend`) instead of by chip-off — and
+   writing kernel/rootfs becomes reachable too, which the 4631 OTA path alone
+   could not do.
+
+### 🔓 Root shell + full flash backup, over the network (2026-08-07)
+
+`busybox telnetd` ships on the device and `rcS` merely comments it out, so the
+hook re-enables what the vendor already built:
+
+```sh
+pgrep telnetd >/dev/null 2>&1 || telnetd -l /bin/sh -p 2323
+```
+
+Fires on the next setting change; then `telnet <camera> 2323` is an interactive
+**root** shell (`uid=0(root)`, host `Zeratul`). Note it starts from the *hook*,
+not at boot, so a power-cycle needs another setting change to bring it back.
+
+**The primary camera's whole 8 MB flash was then pulled off over TCP** — the
+operation that previously required chip-off:
+
+```sh
+dd if=/dev/mtd11 bs=64k | /system/bin/rbxsend     # on the camera
+.venv/bin/python tools/recv_blob.py --out captures/primary_mtd11.bin
+# 8388608 bytes @ ~1.6 MB/s, sha256 4e89f3e6…
+```
+
+Per-partition comparison against the spare's chip-off dump:
+
+| Partition | Identical across units? |
+|---|---|
+| `boot`, `kernel`, `rootfs`, `audio` | **yes** — same firmware build |
+| `tag` | no (245 B) — per-device config/UID |
+| `config` | no (663 B) — runtime settings |
+| `usr`, `usr_bak` | no (2241 B each) |
+| `ae` | no (8733 B) — **auto-exposure calibration** |
+| `vd` | no (20 B) |
+
+⇒ the differing partitions are exactly the per-device identity, and they are now
+backed up.
+
+**This also closed an open question.** `mtd4` in the dump is **byte-identical
+(sha256 match) to the image we flashed**, which *directly observes* the `flashcp`
+write. The earlier no-op rehearsal could only ever mark it "strongly indicated",
+because writing identical bytes leaves nothing to see.
+
+> ⚠️ `primary_mtd11.bin` is **not** a pristine stock image — its `system`
+> partition is our hooked build. To restore the primary to stock, either flash
+> `captures/noop_mtd4.img` over OTA, or splice the spare's stock `system` slice
+> (`0x5B8000..0x768000`) into this dump before writing it back.
+
 ### Complete recipe for a network flash (nothing here is guesswork any more)
 
 1. Open a relay session (`tools/p4p_relay.py`) — LAN only, no cloud.
@@ -364,6 +494,29 @@ hardware**, not just in the disassembly.
 `flashcp` write **strongly indicated**, but by design a no-op write leaves
 nothing observable — mtd4 could not be read back without a shell. Writing
 *modified* content is what would demonstrate the write directly.
+
+### ✅✅ CUSTOM-BUILT FIRMWARE BOOTS (2026-08-07)
+
+Second flash, this time a **`mksquashfs`-produced image of our own** rather than
+the vendor's bytes: stock `/system` with `mkfs.vfat` swapped for a script and the
+original kept as `mkfs.vfat.real` (`tools/build_system_image.py`). 1716256 bytes,
+progress `0x37` → `0x64`, reboot — and the camera came back with a **byte-identical
+961 response**.
+
+That is the whole claim, closed:
+* our SquashFS **mounted** — so `mksquashfs -comp xz -b 131072` output is
+  accepted by this kernel's decompressor;
+* `esp32_sdio.ko` loaded **from the partition we wrote** — Wi-Fi came up, which
+  is the only reason the camera could answer at all;
+* `ubia_t23` is running out of our image, with full ioctrl.
+
+⇒ **Custom firmware, built on a workstation, installed over the network, with no
+hardware access.** The chip-off path is now a recovery mechanism, not a
+prerequisite.
+
+Note the mid-transfer progress value differed between the two flashes (`0x49`
+for the 1769504-byte image, `0x37` for the 1716256-byte one), confirming 4630
+tracks the real transfer rather than replaying a fixed sequence.
 
 **Progress is reported back on ioType 4630**, which the app's headers call
 `FIRMWARE_UPDATE_CHECK_RSP` — an 8-byte body whose **second u32 LE is a
