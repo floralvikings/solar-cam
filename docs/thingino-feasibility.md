@@ -101,7 +101,75 @@ touch /tmp/stopWdg && killall ubia_t23 && /tmp/prudynt
 ```
 Only bake into `/system` once something works. Reboot undoes everything.
 
-### The one remaining unknown: IMP ↔ tx-isp pairing
+## 🎯 ANSWERED: thingino's libimp **works** against the vendor tx-isp
+
+Tested live 2026-08-07 with `prudynt-T23-static` (from `gtxaspec/prudynt-t`)
+pushed to `/tmp` over TFTP — **no flashing**:
+
+```
+[INFO:IMPSystem.cpp]: LIBIMP Version IMP-1.1.0
+[INFO:IMPSystem.cpp]: SYSUTILS Version: SYSUTILS-1.1.0
+[INFO:IMPSystem.cpp]: CPU Information: T23-N
+[INFO:IMPSystem.cpp]: Sensor: cv2003
+```
+kernel side:
+```
+probe ok ------->cv2003
+cv2003 chip found @ 0x35 (i2c0)
+Calibration len = 176288
+Ivdc init! direct_mode is 1
+cv2003 stream on / cv2003 stream off
+```
+
+So third-party IMP userspace initialises against the **vendor's** `tx-isp`,
+acquires the sensor and streams it. The SDK version guess was right too: the
+vendor build string is `FWIF **ZRT**_release_…` and the matching SDK is
+`T23/lib/**1.1.0-zrt**/uclibc/5.4.0` in `gtxaspec/ingenic-lib`.
+
+**Two gotchas that cost time:**
+1. prudynt autodetects the sensor from `/proc/jz/sensor/name`. The vendor's
+   `tx-isp` **does not create it** (`/proc/jz/` has audio, codecs, debug, helix,
+   reset, clock, ddr, gpio, isp, watchdog — no `sensor`). Without it prudynt
+   falls back to its built-in `gc2053` and the driver rejects it:
+   `Failed to acquire subdev gc2053`. The sensor must be set in the config.
+2. **Both** `ubia_t23` and `ubia_first` statically link IMP and hold the ISP;
+   both must be stopped, and `touch /tmp/stopWdg` first or the watchdog reboots.
+
+### What still blocks a working stream
+
+**1. prudynt dies with SIGFPE (exit 136) right after `Sensor: cv2003`.** A full
+`stream0`/`rtsp` config does *not* fix it, so it is not a zero-valued config
+field — on MIPS this is an integer divide-by-zero, most plausibly a frame-rate
+or timing value the vendor's `tx-isp` reports differently from thingino's.
+Diagnosing further needs a build we can instrument; there is no gdb/strace on
+the device.
+
+**2. Only the *static* build can run here.** `prudynt-T23-dynamic` and
+`-hybrid` both want `/lib/ld-musl-mipsel.so.1` plus `libmuslshim`,
+`libwebsockets`, `libaudioshim`… — i.e. the whole thingino userland. This
+rootfs is **uClibc**. So we cannot simply swap in the `1.1.0-zrt` `libimp.so`
+we downloaded; the static build bundles whatever libimp gtxaspec linked, and
+that may well be the non-ZRT variant — a plausible cause of (1).
+
+**3. Size is the hard structural limit.** `prudynt-T23-static` is **4.5 MB**:
+* `/system` (mtd4) is 1728 K total with ~53 K free — it **cannot** be flashed there;
+* `/tmp` is tmpfs, and RAM is 37.5 MB with 21 MB reserved for media (`rmem`),
+  leaving ~9 MB free. Writing 4.5 MB to tmpfs and then mapping it pushes the box
+  into OOM — which is what kept killing `telnetd` mid-transfer, not the network.
+
+⇒ A deployable streamer must be **custom-built**: uClibc, linked against
+`1.1.0-zrt`, and trimmed to a size that fits flash or the tiny RAM budget. That
+needs a real cross-toolchain (thingino's buildroot on a Linux box); only
+binutils is available locally.
+
+### ⚠️ Battery, not software, caused most of the instability
+Repeated "mysterious" drops — telnetd vanishing, a TFTP transfer dying at block
+2334, `uptime` of 13 s and 22 s appearing unprompted — were the camera
+**cold-booting on a failing battery**. A passive watch caught it: 557 s uptime,
+then gone, then back with the vendor app running, while we only read. Run this
+work on **mains power**; every reboot clears tmpfs and undoes the whole setup.
+
+### The IMP ↔ tx-isp pairing (historical note)
 Both vendor binaries **statically link** the Ingenic SDK, so there is no
 `libimp.so` to reuse. A streamer (e.g. thingino's `prudynt`) needs its own
 `libimp` for T23, and that userspace must match the **vendor's built-in
