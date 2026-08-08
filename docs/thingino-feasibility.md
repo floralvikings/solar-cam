@@ -137,12 +137,77 @@ vendor build string is `FWIF **ZRT**_release_…` and the matching SDK is
 
 ### What still blocks a working stream
 
-**1. prudynt dies with SIGFPE (exit 136) right after `Sensor: cv2003`.** A full
-`stream0`/`rtsp` config does *not* fix it, so it is not a zero-valued config
-field — on MIPS this is an integer divide-by-zero, most plausibly a frame-rate
-or timing value the vendor's `tx-isp` reports differently from thingino's.
-Diagnosing further needs a build we can instrument; there is no gdb/strace on
-the device.
+**1. prudynt dies with SIGFPE (exit 136) — localised to the ISP *tuning* pass.**
+A DEBUG run pinned it precisely. **Every core IMP call succeeds:**
+```
+IMP_OSD_SetPoolSize(1048576)
+LIBIMP Version IMP-1.1.0 / SYSUTILS-1.1.0 / CPU T23-N
+IMP_ISP_Open()        = 0      IMP_ISP_AddSensor(&sinfo) = 0
+IMP_ISP_EnableSensor()= 0      IMP_System_Init()         = 0
+IMP_ISP_EnableTuning()= 0
+IMP_ISP_Tuning_SetContrast/Sharpness/Saturation/Brightness(128)
+IMP_ISP_Tuning_SetSinterStrength(128)
+IMP_ISP_Tuning_SetTemperStrength(128)   <-- last line logged
+Floating point exception   [exit=136]
+```
+So the IMP↔`tx-isp` interface is **not** the problem — the sensor is added,
+enabled, and the system and tuning subsystems come up clean. The kernel agrees
+throughout (`probe ok ------->cv2003`, calibration loaded, `stream on`).
+
+prudynt's tuning order, recovered from the binary's own debug strings:
+`Contrast, Sharpness, Saturation, Brightness, SinterStrength, TemperStrength,`
+**`SetISPHflip`**`, SetISPVflip, SetISPRunningMode, SetISPBypass,
+SetAntiFlickerAttr, SetAeComp, SetMaxAgain, SetMaxDgain, SetBcshHue,
+SetDefog/DPC/DRC_Strength, SetBacklightComp, SetHiLightDepress,` **`SetSensorFPS`**.
+
+The fault is therefore inside `SetTemperStrength` or the unlogged `SetISPHflip`.
+Leading hypothesis: **`SetSensorFPS` is applied *last*,** so any earlier tuning
+op that derives timing from the sensor frame rate divides by a rate the vendor's
+driver never populated (thingino's patched `tx-isp` exposes it — this one has no
+`/proc/jz/sensor/` at all). That would be an ordering assumption in prudynt that
+only shows up on a stock vendor driver.
+
+Ruled out as causes: a sensor-only config, a *full* `stream0`/`rtsp` config, and
+the runtime environment — running the same binary **from the SD card** instead of
+tmpfs, with the vendor apps stopped, fails at exactly the same instruction. The
+fault is **in the binary**, so the fix has to be a different build.
+
+Untested next step: set every `image.*` key explicitly, to rule out a
+zero-valued prudynt default being handed to libimp.
+
+## ✅ Dev infrastructure: SD-card controlled, no flashing per iteration
+
+The `/system/bin/tag_env_info` hook now reads two files from the SD card
+(`/tmp/mnt/sdcard`, which `ubia_t23` mounts rw on insert):
+
+| File | Effect |
+|---|---|
+| `rbx_dev` | once per boot: `touch /tmp/stopWdg`, then `killall ubia_t23 ubia_first` |
+| `rbx_init.sh` | once per boot: run it, output to `rbx_init.log` |
+
+Verified live: creating `rbx_dev` and firing ioType 46 gives **0 `ubia_`
+processes, `/tmp/stopWdg` present, 10 MB free, telnetd still up** — no reboot.
+
+**Why it is opt-in and not unconditional.** `killall ubia_t23` also kills P4P,
+which serves the ioType 46 that fires the hook — an unconditional kill would
+remove its own trigger, leaving only a reboot. The hook also fires on the
+vendor's own motion-driven light changes, which would stop the apps at random.
+With the flag on the card, stock behaviour is the default and **pulling the card
+reverts everything**.
+
+Ordering is load-bearing: `stopWdg` must exist *before* the kill, or
+`ubia_watchdog` reboots the box in ~10 s.
+
+**Put binaries on the card, not `/tmp`.** tmpfs is RAM: a 4.5 MB binary there
+permanently costs 4.5 MB of 37.5 MB and repeatedly got telnetd OOM-killed. On
+the card it costs nothing, survives reboots, and the transfer dropped from
+minutes-with-failures to **10 seconds**.
+
+Sequence that works (order matters — dev mode kills P4P, so trigger first):
+```
+wait for P4P  ->  fire hook (telnetd)  ->  create rbx_dev
+              ->  fire hook again (dev mode engages)  ->  transfer  ->  run
+```
 
 **2. Only the *static* build can run here.** `prudynt-T23-dynamic` and
 `-hybrid` both want `/lib/ld-musl-mipsel.so.1` plus `libmuslshim`,

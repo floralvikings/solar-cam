@@ -220,7 +220,7 @@ def main() -> int:
         # tmpfs survives until reboot, and holding a telnet session open across
         # the whole transfer is the least reliable part of this loop.
         size = binary.stat().st_size
-        have = sh.run(f"[ -s /tmp/prudynt ] && wc -c < /tmp/prudynt || echo 0", 4)
+        have = sh.run("stat -c %s /tmp/prudynt 2>/dev/null || echo 0", 4)
         if str(size) in have:
             print(f"\n--- prudynt already present ({size} bytes), skipping transfer ---")
         else:
@@ -230,7 +230,7 @@ def main() -> int:
                    f"> /tmp/tftp.log 2>&1 &)", 3)
             for _ in range(30):
                 time.sleep(5)
-                got = sh.run("wc -c < /tmp/prudynt 2>/dev/null || echo 0", 3)
+                got = sh.run("stat -c %s /tmp/prudynt 2>/dev/null || echo 0", 3)
                 if str(size) in got:
                     break
             print(sh.run("chmod +x /tmp/prudynt; ls -l /tmp/prudynt", 5))

@@ -377,6 +377,14 @@ a research problem.
 Three flashed images tried them. What *does* exist: **`telnetd`**, `tftp`,
 `ping`, `nslookup`, `udhcpc`, `vi`, `dd`, `flashcp`, `flash_eraseall`.
 
+> ⚠️ **This busybox is heavily stripped — check `captures/recon-0.txt` before
+> assuming any coreutil exists.** Confirmed **missing**: `wget`, `nc`, `head`,
+> `tail`, `wc`, `sed`, `awk`, `cut`, `sort`, `uniq`, `base64`, `gzip`/`gunzip`,
+> `xxd`. Each of these has already cost a debugging cycle — a script silently
+> does nothing and looks like a device problem. Substitutes that *do* exist:
+> `stat -c %s` for `wc -c`, `grep` for `sed`/`awk`, `unzip` and `tar` for
+> archives, `dd` for byte ranges.
+
 `/etc/init.d/rcS` ends:
 ```sh
 export PATH=/system/bin:/bin:/sbin:/usr/bin:/usr/sbin
