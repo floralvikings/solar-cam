@@ -67,6 +67,10 @@ tmp/
 *.log
 !docs/**/*.log
 
+# Untracked device identity for the interop probes (UID, view password, IPs).
+# Read by tools/p4p_probe_config.py; NEVER commit this.
+local/
+
 # Repackaging/Frida toolchain artifacts (may contain captured secrets)
 tools/*.keystore
 tools/*.idsig
